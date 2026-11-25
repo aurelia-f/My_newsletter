@@ -1,0 +1,14 @@
+{
+  "name": "my-newsletter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "My Newsletter — Vue.js + Node.js + MySQL (TI510M/TI610M Advanced Web Programming)",
+  "scripts": {
+    "setup": "npm --prefix server install && npm --prefix client install",
+    "build": "npm --prefix client run build",
+    "start": "npm run build && npm --prefix server start",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "seed": "npm --prefix server run seed"
+  }
+}
