@@ -14,10 +14,10 @@ const { requireLogin } = require('../middleware/permissions');
 
 const router = express.Router();
 
-/** The same day, next month. */
-function inAMonth() {
+/** The same day, n months from now. */
+function inNMonths(n) {
   const d = new Date();
-  d.setMonth(d.getMonth() + 1);
+  d.setMonth(d.getMonth() + (Number(n) || 1));
   return d.toISOString().slice(0, 10);
 }
 
@@ -35,7 +35,7 @@ router.get('/grid', wrap(async (req, res) => {
 // --- POST /api/subscriptions/quote --------------------------
 //  "What would this cost me?" before paying.
 router.post('/quote', wrap(async (req, res) => {
-  res.json(await pricing.quote(req.body.add_ons));
+  res.json(await pricing.quote(req.body.add_ons, req.body.months));
 }));
 
 router.use(requireLogin);
@@ -62,16 +62,22 @@ router.get('/mine', wrap(async (req, res) => {
 // --- POST /api/subscriptions --------------------------------
 //  Subscribe, or change add-ons. Payment is simulated.
 router.post('/', wrap(async (req, res) => {
-  const quote = await pricing.quote(req.body.add_ons);
+  const quote = await pricing.quote(req.body.add_ons, req.body.months);
   if (quote.add_ons.length === 0) {
     return res.status(400).json({ error: 'Choose at least one add-on.' });
   }
 
-  const label = quote.full_bundle
-    ? 'Full bundle (everything included)'
-    : 'Subscription: ' + quote.detail.map(a => a.name).join(' + ');
+  const period = quote.months === 1
+    ? '1 month'
+    : (quote.months === 12 ? '1 year' : quote.months + ' months');
 
-  const receipt = await payment.charge(req.body.card, quote.price, label, req.account.id);
+  const label = (quote.full_bundle
+    ? 'Full bundle (everything included)'
+    : 'Subscription: ' + quote.detail.map(a => a.name).join(' + '))
+    + ' · ' + period;
+
+  // We charge the TOTAL for the whole period, not one month.
+  const receipt = await payment.charge(req.body.card, quote.total, label, req.account.id);
 
   // We cancel the previous subscription and open a new one, so the
   // history stays readable in the admin area.
@@ -84,7 +90,8 @@ router.post('/', wrap(async (req, res) => {
     id: uuid(), account_id: req.account.id,
     add_ons: quote.add_ons, monthly_price: quote.price,
     savings: quote.savings, status: 'active',
-    renews_on: inAMonth()
+    months: quote.months, total_paid: quote.total,
+    renews_on: inNMonths(quote.months)
   });
 
   res.status(201).json({ subscription: sub, quote, receipt });

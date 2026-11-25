@@ -107,7 +107,7 @@ export const questions = {
 
 export const subscriptions = {
   grid:      ()   => api.get('/subscriptions/grid'),
-  quote:     (a)  => api.post('/subscriptions/quote', { add_ons: a }),
+  quote:     (a, m) => api.post('/subscriptions/quote', { add_ons: a, months: m }),
   mine:      ()   => api.get('/subscriptions/mine'),
   subscribe: (d)  => api.post('/subscriptions', d),
   cancel:    ()   => api.delete('/subscriptions/mine')

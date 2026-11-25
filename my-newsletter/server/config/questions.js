@@ -218,7 +218,7 @@ const ROTATING_QUESTIONS = [
 // ==========================================================
 //  6. HOW MANY OF EACH
 // ==========================================================
-const SURPRISE_COUNT = 2;   // surprise questions per issue
+const SURPRISE_COUNT = 4;   // surprise questions per issue
 const CHOICE_COUNT   = 2;   // tick-box questions per issue
 const EXPRESS_COUNT  = 5;   // size of the "5 minutes" mode
 

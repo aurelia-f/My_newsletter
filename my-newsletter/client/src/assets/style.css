@@ -211,7 +211,7 @@ label.field > .hint {
   margin-bottom: 9px;
 }
 
-input[type=text], input[type=email], input[type=url], input[type=date],
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]),
 textarea, select {
   width: 100%;
   font-family: var(--sans);
@@ -453,10 +453,9 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.6; }
    Tick-box questions: single and multiple choice
    ========================================================== */
 .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.choice-pill { position: relative; cursor: pointer; }
-.choice-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
-.choice-pill > span {
-  display: inline-block;
+.choice-pill {
+  font-family: var(--sans);
+  cursor: pointer;
   padding: 9px 16px;
   border-radius: 999px;
   border: 1.5px solid var(--cream-dark);
@@ -466,13 +465,14 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.6; }
   color: var(--ink);
   transition: all .14s ease;
 }
-.choice-pill:hover > span { border-color: var(--pink); }
-.choice-pill input:checked + span {
+.choice-pill:hover:not(:disabled) { border-color: var(--pink); }
+.choice-pill.active {
   background: var(--raspberry);
   border-color: var(--raspberry);
   color: var(--cream);
 }
-.choice-pill input:focus-visible + span { box-shadow: 0 0 0 3px var(--pink-veil); }
+.choice-pill:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--pink-veil); }
+.choice-pill:disabled { opacity: .5; cursor: not-allowed; }
 
 .remove-link {
   background: none; border: none; cursor: pointer;
@@ -530,14 +530,23 @@ fieldset.borderless > legend { padding: 0; }
    ========================================================== */
 .stars { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
 .star {
-  background: none; border: none; cursor: pointer;
-  font-size: 1.9rem; line-height: 1;
+  font-family: var(--sans);
+  cursor: pointer;
+  font-size: 1.35rem; line-height: 1;
+  width: 46px; height: 46px;
   color: var(--cream-dark);
-  padding: 0 2px;
-  transition: color .12s ease, transform .12s ease;
+  background: var(--white);
+  border: 1.5px solid var(--cream-dark);
+  border-radius: 999px;
+  transition: all .14s ease;
 }
-.star:hover { transform: scale(1.12); }
-.star.filled { color: var(--gold); }
+.star:hover { border-color: var(--pink); transform: scale(1.06); }
+.star.active {
+  background: var(--raspberry);
+  border-color: var(--raspberry);
+  color: var(--cream);
+}
+.star:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--pink-veil); }
 .stars-readonly { font-size: 1.5rem; color: var(--gold); letter-spacing: .06em; }
 .stars-readonly .empties { color: var(--cream-dark); }
 
@@ -2128,20 +2137,23 @@ body.np-noscroll { overflow: hidden; }
   margin-top: 10px;
 }
 .emoji-chip {
-  height: 38px;
-  font-size: 1.15rem;
+  height: 46px;
+  font-size: 1.35rem;
   line-height: 1;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--cream, #fbf2dc);
+  border: 1.5px solid var(--cream-dark);
+  border-radius: 999px;
+  background: var(--white);
   cursor: pointer;
   padding: 0;
+  transition: all .14s ease;
 }
-.emoji-chip:hover { border-color: var(--pink-pale); }
+.emoji-chip:hover { border-color: var(--pink); transform: scale(1.06); }
 .emoji-chip.chosen {
-  border-color: var(--ink);
-  background: var(--white);
+  background: var(--pink-pale);
+  border-color: var(--raspberry);
+  transform: scale(1.04);
 }
+.emoji-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--pink-veil); }
 
 /* ---------- The "tidying up" card ----------
    Set apart and quietly flagged: these are the only actions on the

@@ -53,10 +53,13 @@ const monthQuestions = computed(() => {
     }
   }
   const all = [...seen.values()];
-  // "Only asked in: …" when a question comes from one group only,
-  // so it is clear why it is there.
+  // Two different things to show:
+  //  · onlyIn   → this question was drawn in SOME groups only
+  //  · perGroup → this question is a draw, so it differs per group
+  //    (it is flagged `rotating` by questionsForMonth)
   for (const q of all) {
     q.onlyIn = q.groups.length < openIssues.value.length ? q.groups.join(', ') : null;
+    q.perGroup = q.rotating === true;
   }
   return all;
 });
@@ -267,8 +270,9 @@ async function askQuestion() {
       <div v-for="q in visibleQuestions" :key="q.key" class="card section-card">
         <h3 class="section-question">{{ q.label }}</h3>
         <p v-if="q.hint" class="hint">{{ q.hint }}</p>
-        <p v-if="q.onlyIn" class="muted" style="font-size:.8rem">
-          Only asked in: {{ q.onlyIn }}
+                <p v-if="q.perGroup || q.onlyIn" class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0 10px">
+          <span v-if="q.perGroup" class="tag">Drawn for this group</span>
+          <span v-if="q.onlyIn" class="tag">Only in: {{ q.onlyIn }}</span>
         </p>
 
         <!-- one line -->

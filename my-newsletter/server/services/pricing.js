@@ -17,7 +17,7 @@ const { Plan, Setting } = require('../models');
  * @param {string[]} codes  the add-ons chosen
  * @returns {{ add_ons, detail, full, price, savings, full_bundle }}
  */
-async function quote(codes) {
+async function quote(codes, months = 1) {
   const asked = [...new Set(codes || [])];
 
   const plans = await Plan.findAll({
@@ -29,8 +29,9 @@ async function quote(codes) {
   // An unknown code is ignored quietly rather than crashing.
   const addOns = asked.filter(c => known.has(c));
   if (addOns.length === 0) {
-    return { add_ons: [], detail: [], full: 0, price: 0, savings: 0,
-             full_bundle: false };
+      return { add_ons: [], detail: [], full: 0, price: 0, savings: 0,
+        full_bundle: false, months: 1, period_discount: 0,
+        total: 0, total_before_discount: 0, period_savings: 0 };
   }
 
   const detail = addOns.map(c => ({
@@ -57,13 +58,29 @@ async function quote(codes) {
     price = full;                   // a single add-on, full price
   }
 
+    // Paying several months up front: 6 months → −10 %, a year → −20 %.
+  // Clamped to 1…24 so nobody can send months = 9999 and pay nothing.
+  const n = Math.min(24, Math.max(1, Math.round(Number(months) || 1)));
+  const sixRate  = await Setting.number('six_month_discount', 0.10);
+  const yearRate = await Setting.number('yearly_discount', 0.20);
+  const periodRate = n >= 12 ? yearRate : (n >= 6 ? sixRate : 0);
+
+  const monthly = round(price);
+  const beforeDiscount = round(monthly * n);
+  const total = round(beforeDiscount * (1 - periodRate));
+
   return {
     add_ons: addOns,
     detail,
     full,
-    price: round(price),
-    savings: round(full - price),
-    full_bundle: fullBundle
+    price: monthly,
+    savings: round(full - monthly),
+    full_bundle: fullBundle,
+    months: n,
+    period_discount: periodRate,
+    total,
+    total_before_discount: beforeDiscount,
+    period_savings: round(beforeDiscount - total)
   };
 }
 

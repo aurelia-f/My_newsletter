@@ -1,5 +1,5 @@
 <!-- ============================================================
-     The admin area: our own dashboard.
+     The creator area: our own dashboard.
 
      Access is locked twice: by the Vue Router guard (convenience)
      and, above all, by the requireSiteAdmin middleware on the

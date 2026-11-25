@@ -223,6 +223,8 @@ CREATE TABLE subscriptions (
   add_ons       JSON         NOT NULL,
   monthly_price DECIMAL(6,2) NOT NULL,
   savings       DECIMAL(6,2) NOT NULL DEFAULT 0,
+  months        INT          NOT NULL DEFAULT 1,
+  total_paid    DECIMAL(8,2) NOT NULL DEFAULT 0,
   status        ENUM('active','cancelled') NOT NULL DEFAULT 'active',
   started_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   renews_on     DATE,

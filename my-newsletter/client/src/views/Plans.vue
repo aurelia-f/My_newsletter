@@ -24,6 +24,12 @@ const loading = ref(true);
 const grid = ref(null);
 const mine = ref(null);
 const chosen = ref([]);
+const months = ref(1);
+const PERIODS = [
+  { n: 1,  label: '1 month',  note: '' },
+  { n: 6,  label: '6 months', note: '−10 %' },
+  { n: 12, label: '1 year',   note: '−20 %' }
+];
 const quote = ref(null);
 const error = ref('');
 const info = ref('');
@@ -51,10 +57,10 @@ onMounted(async () => {
   finally { loading.value = false; }
 });
 
-watch(chosen, recompute, { deep: true });
+watch([chosen, months], recompute, { deep: true });
 
 async function recompute() {
-  try { quote.value = await subscriptions.quote(chosen.value); }
+  try { quote.value = await subscriptions.quote(chosen.value, months.value); }
   catch { quote.value = null; }
 }
 
@@ -68,7 +74,7 @@ async function pay(card) {
   error.value = ''; info.value = '';
   busy.value = true;
   try {
-    await subscriptions.subscribe({ add_ons: chosen.value, card });
+    await subscriptions.subscribe({ add_ons: chosen.value, months: months.value, card });
     await refreshSubscription();
     mine.value = await subscriptions.mine();
     atPayment.value = false;
@@ -114,6 +120,9 @@ async function cancel() {
       <span class="eyebrow">Your subscription</span>
       <h2 style="margin:2px 0 8px;font-size:1.4rem">
         {{ euros(mine.subscription.monthly_price) }} a month
+        <span v-if="mine.subscription.months > 1" class="muted" style="font-size:.9rem">
+          · paid {{ mine.subscription.months }} months up front
+        </span>
       </h2>
       <p class="muted" style="margin:0 0 8px">
         {{ currentAddOns.length }} add-on{{ currentAddOns.length > 1 ? 's' : '' }}
@@ -159,6 +168,25 @@ async function cancel() {
       </label>
     </div>
 
+        <!-- How long you pay for up front -->
+    <div class="card" style="margin-top:18px">
+      <h3>How long?</h3>
+      <p class="muted" style="margin:6px 0 12px">
+        Pay several months up front and it costs less.
+      </p>
+      <div class="pills">
+        <button v-for="p in PERIODS" :key="p.n" type="button"
+                class="choice-pill" :class="{ active: months === p.n }"
+                @click="months = p.n">
+          {{ p.label }}<template v-if="p.note"> · {{ p.note }}</template>
+        </button>
+      </div>
+      <label class="field" style="margin-top:14px">
+        <span class="label">Or choose your own number of months (1 to 24)</span>
+        <input type="number" min="1" max="24" v-model.number="months">
+      </label>
+    </div> 
+
     <!-- The total, worked out by the server -->
     <div v-if="quote && quote.add_ons.length" class="card card-send" style="margin-top:18px">
       <h3>Your total</h3>
@@ -174,10 +202,28 @@ async function cancel() {
         <span class="muted"><s>{{ euros(quote.full) }}</s></span>
       </div>
 
-      <div class="row spread" style="font-size:1.25rem">
-        <strong>{{ quote.full_bundle ? 'Full bundle' : 'To pay' }}</strong>
-        <strong>{{ euros(quote.price) }}/mo</strong>
+      <div class="row spread">
+        <span class="muted">{{ quote.full_bundle ? 'Full bundle' : 'Per month' }}</span>
+        <span class="muted">{{ euros(quote.price) }}/mo</span>
       </div>
+
+      <div v-if="quote.period_discount > 0" class="row spread" style="margin-top:6px">
+        <span class="muted">{{ quote.months }} months up front</span>
+        <span class="muted">
+          <s>{{ euros(quote.total_before_discount) }}</s>
+          · −{{ Math.round(quote.period_discount * 100) }} %
+        </span>
+      </div>
+
+      <div class="row spread" style="font-size:1.25rem;margin-top:8px">
+        <strong>To pay now</strong>
+        <strong>{{ euros(quote.total) }}</strong>
+      </div>
+
+      <p v-if="quote.period_savings > 0" class="muted" style="margin:8px 0 0">
+        Paying {{ quote.months }} months at once saves you
+        <strong>{{ euros(quote.period_savings) }}</strong>.
+      </p>
 
       <p v-if="quote.savings > 0" class="muted" style="margin:8px 0 0">
         You save <strong>{{ euros(quote.savings) }}</strong> every month
@@ -197,9 +243,11 @@ async function cancel() {
 
     <!-- Payment -->
     <div v-if="atPayment && quote" style="margin-top:18px">
-      <CardPayment :amount="quote.price" :busy="busy"
-                   label="Your monthly subscription"
-                   @pay="pay" @cancel="atPayment = false" />
+      <CardPayment :amount="quote.total" :busy="busy"
+              :label="quote.months === 1
+                ? 'Your monthly subscription'
+                : 'Your subscription · ' + quote.months + ' months up front'"
+              @pay="pay" @cancel="atPayment = false" />
     </div>
 
     <!-- The combinations -->
