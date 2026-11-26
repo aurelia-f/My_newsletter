@@ -212,12 +212,12 @@ async function deleteGroup() {
           </div>
 
           <div class="row" style="gap:8px">
-            <span v-if="m.account_id === group.created_by" class="tag">Creator</span>
-            <span v-else-if="m.role === 'admin'" class="tag">Co-admin</span>
+            <span v-if="m.account_id === group.created_by" class="tag">Group creator</span>
+            <span v-else-if="m.role === 'admin'" class="tag">Group co-admin</span>
 
             <template v-if="iAmAdmin && m.account_id !== group.created_by">
               <button v-if="m.role !== 'admin'" class="btn small outline" type="button"
-                      @click="changeRole(m.id, 'admin')">Make co-admin</button>
+                      @click="changeRole(m.id, 'admin')">Make group co-admin</button>
               <button v-else class="btn small outline" type="button"
                       @click="changeRole(m.id, 'member')">Remove the role</button>
               <button class="btn small outline" type="button"

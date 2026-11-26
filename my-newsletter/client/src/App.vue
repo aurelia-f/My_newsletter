@@ -33,7 +33,7 @@ async function leave() {
 
     <div id="header-actions">
       <template v-if="signedIn">
-        <RouterLink v-if="isSiteAdmin" class="btn outline small" to="/admin">Admin</RouterLink>
+        <RouterLink v-if="isSiteAdmin" class="btn outline small" to="/admin">Creator</RouterLink>
         <RouterLink class="btn outline small" to="/plans">Plans</RouterLink>
         <RouterLink class="profile-link" to="/profile"
                     :title="state.account.first_name || 'My profile'">

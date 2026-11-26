@@ -177,7 +177,7 @@ const STATUS_LABELS = {
 
       <EmptyState v-if="!myAdminGroups.length" icon="icon:flower-00"
             title="You do not run any group"
-            detail="The pack commits the whole group, so it is for admins only." />
+            detail="The pack commits the whole group, so it is for group admins only." />
 
       <label v-else class="field" style="margin-top:14px">
         <span class="label">For which group?</span>

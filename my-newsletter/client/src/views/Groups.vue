@@ -166,7 +166,7 @@ async function createGroup() {
     <section v-if="iRun.length" class="panel" :class="{ hidden: tab !== 'admin' }">
       <details class="card card-role disclosure">
         <summary>
-          <span><strong>You are an admin</strong> · what that means</span>
+          <span><strong>You are a group admin</strong> · what that means</span>
           <span class="arrow">▾</span>
         </summary>
         <div class="disclosure-body">
@@ -177,7 +177,7 @@ async function createGroup() {
             <li><strong>Invite your friends</strong> by e-mail, and remove them.</li>
             <li><strong>Open the month's issue.</strong> Without that, nobody can answer.</li>
             <li><strong>Publish</strong> when you think there are enough entries: the whole group can read it then.</li>
-            <li><strong>Name a co-admin</strong> to help you chase people and publish.</li>
+            <li><strong>Name a group co-admin</strong> to help you chase people and publish.</li>
             <li>And like everyone else, <strong>answer the questionnaire</strong>.</li>
           </ul>
           <p class="muted" style="margin-top:14px">
@@ -246,7 +246,7 @@ async function createGroup() {
       <h3>Create a new group</h3>
       <p class="muted" style="margin:6px 0 16px">
         One group per set of friends. They only ever see their own.
-        You will be its admin.
+        You will be its group admin.
       </p>
 
       <p v-if="state.subscription.quota && !state.subscription.quota.unlimited"

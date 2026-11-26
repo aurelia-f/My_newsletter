@@ -21,6 +21,8 @@ const loading = ref(true);
 const purpose = ref('');
 const newEmail = ref('');
 const password = ref('');
+const again = ref('');
+const show = ref(false);
 const error = ref('');
 const info = ref('');
 
@@ -35,6 +37,14 @@ onMounted(async () => {
 
 async function setPassword() {
   error.value = ''; info.value = '';
+
+  // Checked here as well as on the server: a typo in a password
+  // you cannot see is the easiest way to lock yourself out.
+  if (password.value !== again.value) {
+    error.value = 'The two passwords are not the same.';
+    return;
+  }
+
   try {
     await auth.reset({ token: props.token, password: password.value });
     info.value = 'Password changed. Taking you to the sign-in page…';
@@ -70,9 +80,21 @@ async function confirmAddress() {
         <label class="field">
           <span class="label">My new password</span>
           <span class="hint">Eight characters at least.</span>
-          <input type="password" v-model="password" required
+          <input :type="show ? 'text' : 'password'" v-model="password" required
                  autocomplete="new-password">
         </label>
+
+        <label class="field">
+          <span class="label">The same one again</span>
+          <input :type="show ? 'text' : 'password'" v-model="again" required
+                 autocomplete="new-password">
+        </label>
+
+        <label class="row" style="gap:8px;align-items:center;margin:0 0 16px">
+          <input type="checkbox" v-model="show">
+          <span class="muted">Show what I am typing</span>
+        </label>
+
         <button class="btn wide" type="submit">Set it</button>
       </form>
     </div>

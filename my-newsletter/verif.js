@@ -59,6 +59,15 @@ const CHECKS = [
   ['Lot F', 'server/routes/auth.js', 'les groupes suivent la nouvelle adresse',
     ['Member.update'], []],
 
+
+  // ---------- PLACEMENT : les pieges de collage ----------
+  ['Placement', 'client/src/api/client.js', 'groups.remove pointe bien sur /groups',
+    ["api.delete('/groups/' + id)"], []],
+  ['Placement', 'client/src/views/Admin.vue', 'raccourci Allow back sur la ligne',
+    ['const banOf', 'banOf(m.email)'], []],
+  ['Placement', 'client/src/views/Link.vue', 'confirmation du mot de passe',
+    ['const again', 'The two passwords are not the same', 'Show what I am typing'], []],
+
   // ---------- FAUSSE BOITE MAIL : serveur ----------
   ['Boite mail (serveur)', 'server/sql/schema.sql', 'table des mails',
     ['CREATE TABLE mails'], []],
@@ -98,9 +107,28 @@ const CHECKS = [
 
 // Les pieges d'ordre : Express lit ses routes dans l'ordre d'ecriture.
 const ORDER = [
+  ['Placement', 'client/src/api/client.js',
+    'les 4 methodes du lot D sont dans issues, pas dans groups',
+    "export const issues", "pendingDeletions"],
+  ['Placement', 'client/src/views/Admin.vue',
+    'bloc "Banned addresses" dans la section Members',
+    'Banned addresses', '===== ORDERS'],
   ['Lot D', 'server/routes/issues.js',
     'pending-deletions declaree AVANT /:id',
     "'/pending-deletions/:groupId'", "router.get('/:id'"]
+];
+
+
+// Les blocs qui ne doivent exister qu'en UN exemplaire : coller sans
+// supprimer l'ancien est l'erreur la plus frequente.
+const ONCE = [
+  ['Doublons', 'server/models/index.js', 'association authTokens', "as: 'authTokens'"],
+  ['Doublons', 'server/models/index.js', 'association bannedBy', "as: 'bannedBy'"],
+  ['Doublons', 'server/models/index.js', 'association deletionVotes', "as: 'deletionVotes'"],
+  ['Doublons', 'client/src/views/Login.vue', 'panneau "A new password"', 'A new password'],
+  ['Doublons', 'client/src/views/Login.vue', 'lien "No account yet?"', 'No account yet?'],
+  ['Doublons', 'client/src/api/client.js', 'bloc des mots de passe', 'change of address'],
+  ['Doublons', 'client/src/views/Admin.vue', 'bloc "Banned addresses"', 'Banned addresses']
 ];
 
 if (!fs.existsSync('package.json')) {
@@ -163,6 +191,29 @@ for (const [group, file, label, first, second] of ORDER) {
     console.log('  [!!] ' + label + '   (' + file + ')');
     console.log('       ' + first + ' doit etre AVANT ' + second);
     console.log('       sinon Express lit "pending-deletions" comme un id de numero');
+    ko++;
+  }
+}
+
+console.log('\n──── Doublons ────');
+for (const [group, file, label, needle] of ONCE) {
+  const text = read(file);
+  if (text === null) {
+    console.log('  [?] ' + label + '  --> fichier introuvable : ' + file);
+    ko++; continue;
+  }
+  const n = text.split(needle).length - 1;
+  if (n === 1) {
+    console.log('  [OK] ' + label);
+    ok++;
+  } else if (n === 0) {
+    console.log('  [!!] ' + label + '   (' + file + ')');
+    console.log('       introuvable   : ' + needle);
+    ko++;
+  } else {
+    console.log('  [!!] ' + label + '   (' + file + ')');
+    console.log('       present ' + n + ' fois : ' + needle);
+    console.log('       un bloc a ete colle sans supprimer l ancien');
     ko++;
   }
 }

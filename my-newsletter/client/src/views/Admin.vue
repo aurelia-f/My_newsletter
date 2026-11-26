@@ -67,6 +67,10 @@ async function runSearch() {
   catch (e) { error.value = e.message; }
 }
 
+// The ban rows are keyed by e-mail, so this is how a member row
+// finds its own ban and can undo it on the spot.
+const banOf = (email) => bans.value.find(x => x.email === email);
+
 function startBan(m) {
   banTarget.value = m;
   banReason.value = '';
@@ -280,6 +284,11 @@ async function savePrices() {
                       class="btn small outline" type="button" @click="startBan(m)">
                 Ban
               </button>
+              <button v-if="m.banned && banOf(m.email)"
+                      class="btn small outline" type="button"
+                      @click="unban(banOf(m.email).id)">
+                Allow back
+              </button>
             </div>
           </div>
 
@@ -309,6 +318,27 @@ async function savePrices() {
           </div>
         </div>
       </div>
+
+      <template v-if="bans.length">
+        <h3 style="margin:22px 0 10px">Banned addresses</h3>
+        <div class="stack">
+          <div v-for="b in bans" :key="b.id" class="card member-row">
+            <div class="row spread">
+              <div>
+                <strong>{{ b.first_name || b.email.split('@')[0] }}</strong>
+                <p class="muted" style="margin:2px 0 0;font-size:.85rem">
+                  {{ b.email }} · banned {{ shortDate(b.created_at) }}
+                  · {{ b.kept_pages ? 'pages kept' : 'pages erased' }}
+                  <span v-if="b.reason"> · {{ b.reason }}</span>
+                </p>
+              </div>
+              <button class="btn small outline" type="button" @click="unban(b.id)">
+                Allow back
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
     </section>
 
     <!-- ===== ORDERS ===== -->
@@ -350,26 +380,6 @@ async function savePrices() {
         </div>
         <p v-if="!orders.length" class="muted">No orders yet.</p>
       </div>
-            <template v-if="bans.length">
-        <h3 style="margin:22px 0 10px">Banned addresses</h3>
-        <div class="stack">
-          <div v-for="b in bans" :key="b.id" class="card member-row">
-            <div class="row spread">
-              <div>
-                <strong>{{ b.first_name || b.email.split('@')[0] }}</strong>
-                <p class="muted" style="margin:2px 0 0;font-size:.85rem">
-                  {{ b.email }} · banned {{ shortDate(b.created_at) }}
-                  · {{ b.kept_pages ? 'pages kept' : 'pages erased' }}
-                  <span v-if="b.reason"> · {{ b.reason }}</span>
-                </p>
-              </div>
-              <button class="btn small outline" type="button" @click="unban(b.id)">
-                Allow back
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
     </section>
 
     <!-- ===== ADVERTS ===== -->

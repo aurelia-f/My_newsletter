@@ -84,12 +84,7 @@ export const groups = {
   create:     (d)         => api.post('/groups', d),
   one:        (id)        => api.get('/groups/' + id),
   update:     (id, d)     => api.patch('/groups/' + id, d),
-  remove:  (id)     => api.delete('/issues/' + id),
-  // Deleting an issue with the group's agreement
-  pendingDeletions: (groupId) => api.get('/issues/pending-deletions/' + groupId),
-  askDeletion:      (id)      => api.post(`/issues/${id}/deletion`),
-  agreeDeletion:    (id)      => api.post(`/issues/${id}/deletion/agree`),
-  cancelDeletion:   (id)      => api.delete(`/issues/${id}/deletion`),
+  remove:     (id)        => api.delete('/groups/' + id),
   invite:     (id, d)     => api.post(`/groups/${id}/members`, d),
   changeRole: (id, m, r)  => api.patch(`/groups/${id}/members/${m}`, { role: r }),
   removeMember: (id, m)   => api.delete(`/groups/${id}/members/${m}`)
@@ -102,7 +97,13 @@ export const issues = {
   one:     (id)     => api.get('/issues/' + id),
   publish: (id)     => api.post(`/issues/${id}/publish`),
   render:  (id, d)  => api.patch(`/issues/${id}/render`, d),
-  remove:  (id)     => api.delete('/issues/' + id)
+  remove:  (id)     => api.delete('/issues/' + id),
+
+  // Deleting an issue with the group's agreement
+  pendingDeletions: (groupId) => api.get('/issues/pending-deletions/' + groupId),
+  askDeletion:      (id)      => api.post(`/issues/${id}/deletion`),
+  agreeDeletion:    (id)      => api.post(`/issues/${id}/deletion/agree`),
+  cancelDeletion:   (id)      => api.delete(`/issues/${id}/deletion`)
 };
 
 export const entries = {

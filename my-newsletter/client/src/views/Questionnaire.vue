@@ -247,7 +247,7 @@ async function askQuestion() {
     <div v-if="!openIssues.length" class="card card-open" style="margin-top:20px">
       <h3>No issue open for {{ monthInWords(theMonth) }}</h3>
       <p class="muted" style="margin:8px 0 14px">
-        Anyone can open it, admin or not.
+        Anyone can open it, group admin or not.
       </p>
       <button class="btn" type="button" @click="openForThisMonth">
         Open this month in my groups

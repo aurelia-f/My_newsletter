@@ -211,10 +211,10 @@ function print() { window.print(); }
             Nobody has chosen yet. The first to do so decides for the whole group.
           </template>
           <template v-else-if="iAmAdmin">
-            Already chosen. You can change it, you are an admin.
+            Already chosen. You can change it, you are a group admin.
           </template>
           <template v-else>
-            Already chosen for the whole group. Only an admin can change it.
+            Already chosen for the whole group. Only a group admin can change it.
           </template>
         </p>
         <div class="pills">
