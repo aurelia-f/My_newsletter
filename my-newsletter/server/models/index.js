@@ -73,7 +73,7 @@ AuthToken.belongsTo(Account,   { foreignKey: 'account_id', as: 'account' });
 
 // --- The mail catcher ---------------------------------------
 //  Deliberately tied to nothing: a mail is addressed to an e-mail
-//  ADDRESS, which may belong to no account at all.npm start
+//  ADDRESS, which may belong to no account at all.
 
 // --- Making money -------------------------------------------
 Account.hasMany(Subscription,   { foreignKey: 'account_id', as: 'subscriptions' });
