@@ -1,71 +1,99 @@
 // ============================================================
-//  Client-side routing (the course: "Vue Router").
-//
-//  Before, each screen was a separate HTML file. This is a Single
-//  Page Application: one page, and the router swaps the component
-//  in. The addresses keep the same spirit (/groups/:id) so the
-//  back button works and every issue has a shareable link.
+//  Every model, and the associations between them.
+//  This is the only place where relations are declared.
 // ============================================================
-import { createRouter, createWebHistory } from 'vue-router';
-import { state, initialise } from '../api/state';
+const { sequelize } = require('../config/database');
 
-const routes = [
-  { path: '/',            name: 'login',   component: () => import('../views/Login.vue'),
-    meta: { public: true } },
-  { path: '/signup',      name: 'signup',  component: () => import('../views/Signup.vue'),
-    meta: { public: true } },
-    { path: '/plans',       name: 'plans',   component: () => import('../views/Plans.vue'),
-    meta: { public: true } },
+const Account       = require('./Account');
+const Group         = require('./Group');
+const Member        = require('./Member');
+const Issue         = require('./Issue');
+const Entry         = require('./Entry');
+const AskedQuestion = require('./AskedQuestion');
+const Reaction      = require('./Reaction');
+const Draft         = require('./Draft');
+const Setting       = require('./Setting');
+const Plan          = require('./Plan');
+const Subscription  = require('./Subscription');
+const Payment       = require('./Payment');
+const Order         = require('./Order');
+const Ad            = require('./Ad');
+const AdStat        = require('./AdStat');
+const IssueDeletionVote = require('./IssueDeletionVote');
+const Ban = require('./Ban');
+const AuthToken = require('./AuthToken');
+const Mail = require('./Mail');
 
-  // Public on purpose: somebody resetting a password is, by
-  // definition, not signed in.
-  { path: '/mailbox',     name: 'mailbox', component: () => import('../views/Mailbox.vue'),
-    meta: { public: true } },
-  { path: '/link/:token', name: 'link',    component: () => import('../views/Link.vue'),
-    props: true, meta: { public: true } },
+// --- Groups and members -------------------------------------
+Account.hasMany(Group,   { foreignKey: 'created_by', as: 'createdGroups' });
+Group.belongsTo(Account, { foreignKey: 'created_by', as: 'creator' });
 
-  { path: '/groups',      name: 'groups',  component: () => import('../views/Groups.vue') },
-  { path: '/groups/:id',  name: 'group',   component: () => import('../views/Group.vue'), props: true },
-  { path: '/profile',     name: 'profile', component: () => import('../views/Profile.vue') },
-  { path: '/write/:month?', name: 'write', component: () => import('../views/Questionnaire.vue'), props: true },
-  { path: '/issues',      name: 'issues',  component: () => import('../views/Issues.vue') },
-  { path: '/issues/:id',  name: 'issue',   component: () => import('../views/Issue.vue'), props: true },
-  { path: '/shop',        name: 'shop',    component: () => import('../views/Shop.vue') },
-  { path: '/admin',       name: 'admin',   component: () => import('../views/Admin.vue'),
-    meta: { siteAdmin: true } },
+Group.hasMany(Member,    { foreignKey: 'group_id', as: 'members', onDelete: 'CASCADE' });
+Member.belongsTo(Group,  { foreignKey: 'group_id', as: 'group' });
 
-  { path: '/:rest(.*)',   redirect: '/groups' }
-];
+Account.hasMany(Member,  { foreignKey: 'account_id', as: 'memberships' });
+Member.belongsTo(Account,{ foreignKey: 'account_id', as: 'account' });
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-  scrollBehavior: () => ({ top: 0 })
-});
+// --- Issues and entries -------------------------------------
+Group.hasMany(Issue,     { foreignKey: 'group_id', as: 'issues', onDelete: 'CASCADE' });
+Issue.belongsTo(Group,   { foreignKey: 'group_id', as: 'group' });
 
-// ------------------------------------------------------------
-//  The navigation guard.
-//  It replaces the old `requireSession()` that every page called:
-//  one rule, in one place, for every private page.
-//
-//  ⚠️ This guard is a CONVENIENCE, not security: it stops an empty
-//  page being shown. The real protection is server-side, in the
-//  Express middleware. Nothing sensitive passes through here.
-// ------------------------------------------------------------
-router.beforeEach(async (to) => {
-  if (!state.ready) await initialise();
+Issue.hasMany(Entry,     { foreignKey: 'issue_id', as: 'entries', onDelete: 'CASCADE' });
+Entry.belongsTo(Issue,   { foreignKey: 'issue_id', as: 'issue' });
 
-  if (!to.meta.public && !state.account) {
-    return { name: 'login', query: { next: to.fullPath } };
-  }
-  if (to.meta.siteAdmin && state.account?.site_role !== 'admin') {
-    return { name: 'groups' };
-  }
-  // Already signed in: the login page has no reason to show.
-  if (state.account && (to.name === 'login' || to.name === 'signup')) {
-    return { name: 'groups' };
-  }
-  return true;
-});
+Account.hasMany(Entry,   { foreignKey: 'account_id', as: 'entries' });
+Entry.belongsTo(Account, { foreignKey: 'account_id', as: 'author' });
 
-export default router;
+Issue.hasMany(IssueDeletionVote,     { foreignKey: 'issue_id', as: 'deletionVotes', onDelete: 'CASCADE' });
+IssueDeletionVote.belongsTo(Issue,   { foreignKey: 'issue_id', as: 'issue' });
+IssueDeletionVote.belongsTo(Account, { foreignKey: 'account_id', as: 'voter' });
+IssueDeletionVote.belongsTo(Account, { foreignKey: 'requested_by', as: 'requester' });
+
+// --- Questions between friends ------------------------------
+Issue.hasMany(AskedQuestion,    { foreignKey: 'issue_id', as: 'askedQuestions', onDelete: 'CASCADE' });
+AskedQuestion.belongsTo(Issue,  { foreignKey: 'issue_id', as: 'issue' });
+AskedQuestion.belongsTo(Account,{ foreignKey: 'author_id', as: 'author' });
+AskedQuestion.belongsTo(Account,{ foreignKey: 'target_id', as: 'target' });
+
+// --- Reactions ----------------------------------------------
+Entry.hasMany(Reaction,     { foreignKey: 'entry_id', as: 'reactions', onDelete: 'CASCADE' });
+Reaction.belongsTo(Entry,   { foreignKey: 'entry_id', as: 'entry' });
+Reaction.belongsTo(Account, { foreignKey: 'account_id', as: 'author' });
+
+// --- Drafts -------------------------------------------------
+Account.hasMany(Draft,   { foreignKey: 'account_id', as: 'drafts' });
+Draft.belongsTo(Account, { foreignKey: 'account_id', as: 'account' });
+
+// --- Banned addresses ---------------------------------------
+Ban.belongsTo(Account, { foreignKey: 'banned_by', as: 'bannedBy' });
+
+// --- One-shot codes -----------------------------------------
+Account.hasMany(AuthToken,     { foreignKey: 'account_id', as: 'authTokens', onDelete: 'CASCADE' });
+AuthToken.belongsTo(Account,   { foreignKey: 'account_id', as: 'account' });
+
+// --- The mail catcher ---------------------------------------
+//  Deliberately tied to nothing: a mail is addressed to an e-mail
+//  ADDRESS, which may belong to no account at all.
+
+// --- One-shot codes -----------------------------------------
+
+// --- Making money -------------------------------------------
+Account.hasMany(Subscription,   { foreignKey: 'account_id', as: 'subscriptions' });
+Subscription.belongsTo(Account, { foreignKey: 'account_id', as: 'account' });
+
+Account.hasMany(Payment,   { foreignKey: 'account_id', as: 'payments' });
+Payment.belongsTo(Account, { foreignKey: 'account_id', as: 'account' });
+
+Account.hasMany(Order,   { foreignKey: 'account_id', as: 'orders' });
+Order.belongsTo(Account, { foreignKey: 'account_id', as: 'account' });
+Order.belongsTo(Issue,   { foreignKey: 'issue_id', as: 'issue' });
+Order.belongsTo(Group,   { foreignKey: 'group_id', as: 'group' });
+
+Ad.hasMany(AdStat,     { foreignKey: 'ad_id', as: 'stats', onDelete: 'CASCADE' });
+AdStat.belongsTo(Ad,   { foreignKey: 'ad_id', as: 'ad' });
+
+module.exports = {
+  sequelize,
+  Account, Group, Member, Issue, Entry, AskedQuestion, Reaction,
+  Draft, Setting, Plan, Subscription, Payment, Order, Ad, AdStat, IssueDeletionVote, Ban, AuthToken, Mail
+};

@@ -2319,3 +2319,110 @@ input[type=color] {
 
 /* The newspaper thumb inside a button: at text size. */
 .btn .group-icon { width: 1.25em; height: 1.25em; vertical-align: -.3em; }
+
+/* ==========================================================
+   PHONE AND COMPUTER — the rest of the breakpoints
+   ==========================================================
+   Six breakpoints already lived above (600, 700, 760, 860,
+   1100 px, plus the print blocks). What follows completes them
+   rather than replacing them, and is aimed at the two screens
+   that matter most on a phone: the questionnaire, and the
+   newspaper itself.
+
+   Written mobile-last (max-width) to match the rest of the file.
+   ========================================================== */
+
+/* ---------- Tablet and small laptop ---------- */
+@media (max-width: 1024px) {
+  .page { padding: 26px 20px 90px; }
+
+  /* An A4 sheet is 794 px wide. Below that it must shrink, or the
+     reader scrolls sideways to read a newspaper. */
+  .newspaper { --np-zoom: .88; }
+}
+
+/* ---------- Phone, landscape · small tablet ---------- */
+@media (max-width: 860px) {
+  .newspaper { --np-zoom: .72; }
+
+  /* The questionnaire is long: tighter cards mean less scrolling. */
+  .section-card { margin-bottom: 14px; }
+
+  /* The group headings of the questionnaire stay readable when
+     the name is long: the icon keeps its size, the name wraps. */
+  .section-title.row { flex-wrap: wrap; gap: 8px; }
+}
+
+/* ---------- Phone, portrait ---------- */
+@media (max-width: 600px) {
+  /* Reading a newspaper on a phone: the sheet fits the width and
+     the reader scrolls down, never sideways. */
+  .newspaper { --np-zoom: .44; }
+
+  /* Tabs scroll instead of wrapping into three sad rows. */
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; }
+
+  /* Answering with a thumb: targets big enough to hit. */
+  .choice-pill { padding: 10px 15px; font-size: .9rem; }
+  .star { font-size: 1.9rem; }
+  .emoji-chip { font-size: 1.5rem; }
+  .slider input[type="range"] { height: 28px; }
+
+  /* Photos: a tidy grid rather than a ragged row. */
+  .thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  }
+  .thumb, .thumb img, .thumb video { width: 100%; height: auto; }
+
+  /* A full-width button is easier to reach at the bottom of a
+     long form. */
+  .card-send .btn.wide,
+  .dropzone { width: 100%; }
+
+  /* The step trail wraps instead of pushing the page sideways. */
+  .steps { font-size: .76rem; gap: 4px 10px; }
+
+  /* Two columns of figures rather than four squeezed ones. */
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- Small phone ---------- */
+@media (max-width: 420px) {
+  .page { padding: 16px 12px 80px; }
+  .card, .article { padding: 16px; }
+
+  h1 { font-size: 1.7rem; }
+  .section-question { font-size: 1.05rem; }
+  .one-word { font-size: 1.25rem; }
+
+  /* Below this width, three figures side by side are unreadable. */
+  .grid { grid-template-columns: 1fr; }
+
+  /* The admin member rows stack: name on top, buttons underneath. */
+  .member-row .row.spread { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+
+/* ---------- Landscape phone, short screen ----------
+   Height, not width: a phone held sideways has room across but
+   almost none down, so the big headers have to give way. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .cover { padding-top: 14px; padding-bottom: 14px; }
+  .cover h1 { font-size: 1.5rem; }
+  .site-header { position: static; }
+}
+
+/* ---------- Pointer-less screens ----------
+   A touch screen has no hover, so anything that only appears on
+   hover is unreachable. These stay visible instead. */
+@media (hover: none) {
+  .np-handle,
+  .thumb .remove-link { opacity: 1; }
+}

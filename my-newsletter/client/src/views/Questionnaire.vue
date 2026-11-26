@@ -1,10 +1,18 @@
 <!-- ============================================================
-     The month's questionnaire.
+     The month's questionnaire, arranged by group.
 
-     This is the heart of the site: you do NOT fill in one form per
-     group. You fill one in once, into a private draft that saves
-     itself, then you tick the groups to send it to. The server
-     maps each answer onto the right question of each issue.
+     You still fill it in ONCE, into a private draft that saves
+     itself. What changed is the shape of the form:
+
+       1. the questions common to all your groups, once;
+       2. then one section per group, headed by its name and its
+          icon, holding the questions drawn for that group alone;
+       3. at the end, one page per group, each going only to the
+          group it belongs to.
+
+     The answers are keyed by question, not by group, so a common
+     question is answered once and travels to every page. The
+     server maps each answer onto the right question of each issue.
      ============================================================ -->
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
@@ -13,6 +21,7 @@ import { entries, issues, questions as apiQuestions, profiles, groups as apiGrou
 import { state } from '../api/state';
 import { monthInWords, currentMonth } from '../api/dates';
 import GroupIcon from '../components/GroupIcon.vue';
+import QuestionField from '../components/QuestionField.vue';
 import Loading from '../components/Loading.vue';
 import Notice from '../components/Notice.vue';
 import Advert from '../components/Advert.vue';
@@ -38,42 +47,78 @@ const newQuestion = ref('');
 const target = ref('');
 const issueForQuestion = ref('');
 
-/** The month's questions, de-duplicated across the groups. */
-const monthQuestions = computed(() => {
-  const seen = new Map();
+const expressIds = computed(() => new Set(state.config?.express_ids || []));
+
+/**
+ * Every question of the month, with the groups it belongs to and
+ * how many of them. Built once and read by the two lists below.
+ */
+const index = computed(() => {
+  const byKey = new Map();
   for (const issue of openIssues.value) {
     for (const q of issue.questions || []) {
       const key = keyOf(q);
-      if (!seen.has(key)) {
-        seen.set(key, { ...q, key, groups: [issue.group?.name].filter(Boolean) });
-      } else if (issue.group?.name) {
-        const already = seen.get(key);
-        if (!already.groups.includes(issue.group.name)) already.groups.push(issue.group.name);
+      if (!byKey.has(key)) {
+        byKey.set(key, { ...q, key, groups: [], count: 0 });
+      }
+      const entry = byKey.get(key);
+      entry.count += 1;
+      if (issue.group?.name && !entry.groups.includes(issue.group.name)) {
+        entry.groups.push(issue.group.name);
       }
     }
   }
-  const all = [...seen.values()];
-  // Two different things to show:
-  //  · onlyIn   → this question was drawn in SOME groups only
-  //  · perGroup → this question is a draw, so it differs per group
-  //    (it is flagged `rotating` by questionsForMonth)
-  for (const q of all) {
+  for (const q of byKey.values()) {
+    // onlyIn   → drawn in some groups only
+    // perGroup → a draw, so it differs from one group to the next
     q.onlyIn = q.groups.length < openIssues.value.length ? q.groups.join(', ') : null;
     q.perGroup = q.rotating === true;
   }
-  return all;
+  return byKey;
 });
 
-const expressIds = computed(() => new Set(state.config?.express_ids || []));
-
-const visibleQuestions = computed(() => {
-  if (!express.value) return monthQuestions.value;
-  return monthQuestions.value.filter(q => q.express === true || expressIds.value.has(q.id));
+/** The fixed sections, the season, the feast: asked everywhere. */
+const commonQuestions = computed(() => {
+  const n = openIssues.value.length;
+  if (!n) return [];
+  return [...index.value.values()]
+    .filter(q => q.count === n && q.rotating !== true);
 });
+
+const commonKeys = computed(() => new Set(commonQuestions.value.map(q => q.key)));
+
+/**
+ * One section per group: everything that is NOT common, in the
+ * order the issue gives it. A question drawn in two groups shows
+ * up in both sections and shares a single answer — it is the same
+ * question, so it deserves the same answer.
+ */
+const groupSections = computed(() =>
+  openIssues.value.map(issue => ({
+    issue,
+    questions: (issue.questions || [])
+      .map(q => index.value.get(keyOf(q)))
+      .filter(q => q && !commonKeys.value.has(q.key))
+  })));
+
+const keep = (list) => express.value
+  ? list.filter(q => q.express === true || expressIds.value.has(q.id))
+  : list;
+
+const commonVisible = computed(() => keep(commonQuestions.value));
+
+const sectionsVisible = computed(() =>
+  groupSections.value
+    .map(s => ({ ...s, questions: keep(s.questions) }))
+    .filter(s => s.questions.length || askedIn(s.issue).length));
 
 /** Questions aimed at me personally: always visible. */
 const askedOfMe = computed(() =>
   asked.value.filter(q => !q.target_id || q.target_id === state.account?.id));
+
+function askedIn(issue) {
+  return askedOfMe.value.filter(q => q.issue_id === issue.id);
+}
 
 const possibleTargets = computed(() => {
   const issue = openIssues.value.find(i => i.id === issueForQuestion.value);
@@ -118,8 +163,12 @@ async function load() {
 
     if (openIssues.value.length) {
       issueForQuestion.value = openIssues.value[0].id;
-      const batches = await Promise.all(
-        openIssues.value.map(i => apiQuestions.forIssue(i.id).catch(() => [])));
+      const batches = await Promise.all(openIssues.value.map(async i => {
+        const list = await apiQuestions.forIssue(i.id).catch(() => []);
+        // Stamped with the issue so each question sits in its own
+        // group's section rather than in one shared pile.
+        return list.map(q => ({ ...q, issue_id: q.issue_id || i.id }));
+      }));
       asked.value = batches.flat();
     }
   } catch (e) {
@@ -144,24 +193,6 @@ watch([draft, media], () => {
     } catch { saved.value = ''; }
   }, 2000);
 }, { deep: true });
-
-function valueOf(q) { return draft.value[q.key]; }
-function setValue(q, v) { draft.value[q.key] = v; }
-
-function toggleMulti(q, choice) {
-  const currentValue = Array.isArray(draft.value[q.key]) ? [...draft.value[q.key]] : [];
-  const i = currentValue.indexOf(choice);
-  if (i >= 0) currentValue.splice(i, 1); else currentValue.push(choice);
-  draft.value[q.key] = currentValue;
-}
-
-function toggleEmoji(q, emoji) {
-  const currentValue = Array.isArray(draft.value[q.key]) ? [...draft.value[q.key]] : [];
-  const i = currentValue.indexOf(emoji);
-  if (i >= 0) currentValue.splice(i, 1);
-  else if (currentValue.length < 3) currentValue.push(emoji);   // three, no more
-  draft.value[q.key] = currentValue;
-}
 
 async function addPhotos(e) {
   const files = [...(e.target.files || [])];
@@ -257,7 +288,8 @@ async function askQuestion() {
     <template v-else>
       <div class="row spread" style="margin:18px 0">
         <p class="muted" style="margin:0">
-          Fill it in once, for {{ openIssues.length }} group{{ openIssues.length > 1 ? 's' : '' }}.
+          The questions everybody gets, once. Then the ones drawn for each
+          of your {{ openIssues.length }} group{{ openIssues.length > 1 ? 's' : '' }}.
         </p>
         <button class="btn outline small" type="button" @click="express = !express">
           {{ express ? 'The whole questionnaire' : '5-minute mode' }}
@@ -266,106 +298,36 @@ async function askQuestion() {
 
       <Advert place="questionnaire_strip" />
 
-      <!-- The questions -->
-      <div v-for="q in visibleQuestions" :key="q.key" class="card section-card">
-        <h3 class="section-question">{{ q.label }}</h3>
-        <p v-if="q.hint" class="hint">{{ q.hint }}</p>
-                <p v-if="q.perGroup || q.onlyIn" class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0 10px">
-          <span v-if="q.perGroup" class="tag">Drawn for this group</span>
-          <span v-if="q.onlyIn" class="tag">Only in: {{ q.onlyIn }}</span>
+      <!-- ===== 1. For everybody ===== -->
+      <template v-if="commonVisible.length">
+        <h2 class="section-title">For everybody</h2>
+        <p class="muted" style="margin:0 0 14px">
+          These answers go on every one of your pages, whatever the group.
         </p>
 
-        <!-- one line -->
-        <input v-if="q.type === 'short'" type="text"
-               :value="valueOf(q)" @input="setValue(q, $event.target.value)">
+        <QuestionField v-for="q in commonVisible" :key="q.key"
+                       :question="q" :draft="draft" :media="media"
+                       @add-photos="addPhotos" @remove-media="removeMedia" />
+      </template>
 
-        <!-- a paragraph -->
-        <textarea v-else-if="q.type === 'long'" rows="4"
-                  :value="valueOf(q)" @input="setValue(q, $event.target.value)"></textarea>
+      <!-- ===== 2. One section per group ===== -->
+      <template v-for="s in sectionsVisible" :key="s.issue.id">
+        <h2 class="section-title row" style="gap:10px;align-items:center">
+          <GroupIcon :value="s.issue.group?.icon" />
+          <span>{{ s.issue.group?.name }}</span>
+        </h2>
+        <p class="muted" style="margin:0 0 14px">
+          Drawn for this group alone. Nobody in your other groups sees
+          these questions, or your answers to them.
+        </p>
 
-        <!-- a single word -->
-        <input v-else-if="q.type === 'word'" type="text" class="one-word" maxlength="24"
-               :value="valueOf(q)" @input="setValue(q, $event.target.value.split(' ')[0])">
+        <QuestionField v-for="q in s.questions" :key="q.key"
+                       :question="q" :draft="draft" :media="media"
+                       @add-photos="addPhotos" @remove-media="removeMedia" />
 
-        <!-- one answer only -->
-        <div v-else-if="q.type === 'choice'" class="pills">
-          <button v-for="c in q.choices" :key="c" type="button"
-                  class="choice-pill" :class="{ active: valueOf(q) === c }"
-                  @click="setValue(q, valueOf(q) === c ? null : c)">{{ c }}</button>
-        </div>
-
-        <!-- several answers -->
-        <div v-else-if="q.type === 'multi'" class="pills">
-          <button v-for="c in q.choices" :key="c" type="button"
-                  class="choice-pill"
-                  :class="{ active: (valueOf(q) || []).includes(c) }"
-                  @click="toggleMulti(q, c)">{{ c }}</button>
-        </div>
-
-        <!-- 0 to 10 -->
-        <div v-else-if="q.type === 'slider'" class="slider">
-          <input type="range" :min="q.min ?? 0" :max="q.max ?? 10"
-                 :value="valueOf(q) ?? 5"
-                 @input="setValue(q, Number($event.target.value))">
-          <div class="row spread">
-            <span class="muted">{{ q.lowLabel }}</span>
-            <span class="slider-value">{{ valueOf(q) ?? 5 }}</span>
-            <span class="muted">{{ q.highLabel }}</span>
-          </div>
-        </div>
-
-        <!-- five stars -->
-        <div v-else-if="q.type === 'rating'" class="stars">
-          <button v-for="n in 5" :key="n" type="button" class="star"
-                  :class="{ active: (valueOf(q) || 0) >= n }"
-                  @click="setValue(q, valueOf(q) === n ? 0 : n)">★</button>
-        </div>
-
-        <!-- up to three emojis -->
-        <div v-else-if="q.type === 'emojis'">
-          <p class="emoji-counter muted">
-            {{ (valueOf(q) || []).length }} / 3 — {{ (valueOf(q) || []).join(' ') }}
-          </p>
-          <div class="emoji-palette">
-            <button v-for="e in (state.config?.emoji_palette || [])" :key="e"
-                    type="button" class="emoji-chip"
-                    :class="{ chosen: (valueOf(q) || []).includes(e) }"
-                    @click="toggleEmoji(q, e)">{{ e }}</button>
-          </div>
-        </div>
-
-        <!-- title + link -->
-        <template v-else-if="q.type === 'music'">
-          <input type="text" placeholder="Title and artist"
-                 :value="valueOf(q)" @input="setValue(q, $event.target.value)">
-          <input type="url" placeholder="Spotify or YouTube link" style="margin-top:8px"
-                 :value="draft[q.key + '_link']"
-                 @input="draft[q.key + '_link'] = $event.target.value">
-        </template>
-
-        <!-- photos and videos -->
-        <template v-else-if="q.type === 'photos'">
-          <label class="dropzone">
-            <strong>Choose photos or videos</strong>
-            <p class="muted">They will appear on your page this month.</p>
-            <input type="file" accept="image/*,video/mp4" multiple @change="addPhotos">
-          </label>
-          <div v-if="media.length" class="thumbs">
-            <div v-for="(m, i) in media" :key="i" class="thumb">
-              <video v-if="m.type === 'video'" :src="m.url"></video>
-              <img v-else :src="m.url" alt="">
-              <button type="button" class="remove-link" @click="removeMedia(i)">×</button>
-            </div>
-          </div>
-        </template>
-
-        <input v-else type="text" :value="valueOf(q)" @input="setValue(q, $event.target.value)">
-      </div>
-
-      <!-- The questions from friends -->
-      <template v-if="askedOfMe.length">
-        <h2 class="section-title">Your friends are asking</h2>
-        <div v-for="q in askedOfMe" :key="q.id" class="card section-card asked-question">
+        <!-- The questions your friends in THIS group are asking -->
+        <div v-for="q in askedIn(s.issue)" :key="q.id"
+             class="card section-card asked-question">
           <h3 class="section-question">{{ q.text }}</h3>
           <p class="hint">
             From {{ q.author?.first_name || 'a friend' }}
@@ -380,8 +342,8 @@ async function askQuestion() {
       <div class="card" style="margin-top:18px">
         <h3>Ask a question</h3>
         <p class="muted" style="margin:6px 0 14px">
-          It joins this month's questionnaire straight away, and the answer
-          appears in the issue.
+          It joins this month's questionnaire straight away, in the section
+          of the group you choose, and the answer appears in the issue.
         </p>
         <form @submit.prevent="askQuestion">
           <label class="field">
@@ -408,12 +370,15 @@ async function askQuestion() {
         </form>
       </div>
 
-      <!-- Sending -->
+      <!-- ===== 3. One page per group ===== -->
       <div class="card card-send" style="margin-top:22px">
-        <h3>Send my page</h3>
+        <h3>One page per group</h3>
         <p class="muted" style="margin:6px 0 14px">
-          Tick the groups that get this page. You can leave some out and
-          come back later: everything is kept.
+          A separate page is made for each group you tick: the answers
+          everybody gets, plus the ones drawn for that group.
+          <strong>These pages are not linked to one another</strong> — each
+          one goes to its own group and nowhere else. You can leave a group
+          out and come back later: everything is kept.
         </p>
 
         <label v-for="i in openIssues" :key="i.id" class="group-row row"
@@ -426,18 +391,9 @@ async function askQuestion() {
 
         <button class="btn wide" type="button" style="margin-top:16px"
                 :disabled="!chosen.length || sending" @click="send">
-          {{ sending ? 'Sending…' : `Send to ${chosen.length} group${chosen.length > 1 ? 's' : ''}` }}
+          {{ sending ? 'Sending…' : `Send ${chosen.length} page${chosen.length > 1 ? 's' : ''}` }}
         </button>
       </div>
     </template>
   </div>
 </template>
-
-<style scoped>
-/* style.css styles ".dropzone" on a div. Here it is a label, which
-   is inline by default: without this its 26px of padding spills
-   over the hint text instead of pushing the layout. The shared
-   stylesheet is left alone. */
-.dropzone { display: block; }
-.dropzone p { margin: 4px 0 0; }
-</style>
