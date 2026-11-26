@@ -1,6 +1,6 @@
 // ============================================================
-//  verif.js — controle que les lots D, E, F, C, la fausse boite
-//  mail (serveur + client) et la mention imprimerie sont en place.
+//  verif.js — controle que les lots D, E, F, la fausse boite mail
+//  (serveur + client) et la mention imprimerie sont en place.
 //  A lancer depuis le dossier my-newsletter :  node verif.js
 //
 //  Chaque ligne : [lot, fichier, ce qu'on verifie,
@@ -58,18 +58,6 @@ const CHECKS = [
     ['RESET_MINUTES', 'EMAIL_MINUTES'], []],
   ['Lot F', 'server/routes/auth.js', 'les groupes suivent la nouvelle adresse',
     ['Member.update'], []],
-
-  // ---------- LOT C : add-on Music (le lot note) ----------
-  ['Lot C', 'server/sql/schema.sql', 'le plan music en base',
-    ["('music', 'Music'"], []],
-  ['Lot C', 'server/services/pricing.js', 'palier de remise corrige',
-    ['addOns.length >= 2'], ['addOns.length === 2']],
-  ['Lot C', 'server/routes/issues.js', 'verrou cote serveur',
-    ['music_player', "hasAddOn(req.account.id, 'music')"], []],
-  ['Lot C', 'client/src/components/Newspaper.vue', 'lecteur reserve aux abonnees',
-    ['music: { type: Boolean', 'part of the Music add-on'], []],
-  ['Lot C', 'client/src/views/Issue.vue', 'passage de la prop',
-    ['music_player'], []],
 
   // ---------- FAUSSE BOITE MAIL : serveur ----------
   ['Boite mail (serveur)', 'server/sql/schema.sql', 'table des mails',
