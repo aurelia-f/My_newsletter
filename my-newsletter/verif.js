@@ -1,50 +1,118 @@
 // ============================================================
-//  verif.js — contrôle que les lots 1, 3 et 9 sont bien en place.
-//  À lancer depuis le dossier my-newsletter :  node verif.js
+//  verif.js — controle que les lots D, E, F, C, la fausse boite
+//  mail (serveur + client) et la mention imprimerie sont en place.
+//  A lancer depuis le dossier my-newsletter :  node verif.js
+//
+//  Chaque ligne : [lot, fichier, ce qu'on verifie,
+//                  doit contenir, ne doit PLUS contenir]
 // ============================================================
 const fs = require('fs');
 const path = require('path');
 
 const CHECKS = [
-  // ---------- LOT 1 : boutons et inputs ----------
-  ['Lot 1', 'client/src/assets/style.css', 'inputs tous pareils',
-    ['input:not([type=checkbox])'], ['input[type=text], input[type=email]']],
-  ['Lot 1', 'client/src/assets/style.css', 'pastilles reparees',
-    ['.choice-pill.active'], ['.choice-pill > span', '.choice-pill input:checked']],
-  ['Lot 1', 'client/src/assets/style.css', 'etoiles reparees',
-    ['.star.active'], ['.star.filled']],
-  ['Lot 1', 'client/src/assets/style.css', 'emojis harmonises',
-    ['.emoji-chip:focus-visible'], []],
+  // ---------- LOT D : supprimer un numero, avec vote ----------
+  ['Lot D', 'server/sql/schema.sql', 'table des votes',
+    ['CREATE TABLE issue_deletion_votes'], []],
+  ['Lot D', 'server/models/IssueDeletionVote.js', 'modele du vote',
+    ['issue_deletion_votes', 'requested_by'], []],
+  ['Lot D', 'server/models/index.js', 'modele branche',
+    ["require('./IssueDeletionVote')", 'deletionVotes', 'IssueDeletionVote, Ban'], []],
+  ['Lot D', 'server/routes/issues.js', 'qui peut voter',
+    ['async function votersOf', 'async function deleteIfUnanimous'], []],
+  ['Lot D', 'server/routes/issues.js', 'les 4 routes',
+    ["'/pending-deletions/:groupId'", "'/:id/deletion'",
+     "'/:id/deletion/agree'", 'IssueDeletionVote'], []],
+  ['Lot D', 'client/src/api/client.js', 'appels du client',
+    ['pendingDeletions', 'askDeletion', 'agreeDeletion', 'cancelDeletion'], []],
+  ['Lot D', 'client/src/views/Group.vue', 'bandeau et boutons',
+    ['pendingDeletions', 'deletionFor', 'Ask to delete', 'I agree', 'Call it off'], []],
 
-  // ---------- LOT 3 : questions personnalisees ----------
-  ['Lot 3', 'server/config/questions.js', '4 questions surprises',
-    ['SURPRISE_COUNT = 4'], ['SURPRISE_COUNT = 2']],
-  ['Lot 3', 'client/src/views/Questionnaire.vue', 'calcul du badge',
-    ['q.perGroup = q.rotating === true'], []],
-  ['Lot 3', 'client/src/views/Questionnaire.vue', 'affichage du badge',
-    ['Drawn for this group'], ['Only asked in:']],
+  // ---------- LOT E : bannir et supprimer un membre ----------
+  ['Lot E', 'server/sql/schema.sql', 'table des bannies',
+    ['CREATE TABLE bans'], []],
+  ['Lot E', 'server/models/Ban.js', 'modele du ban',
+    ['Ban.isBanned', 'kept_pages'], []],
+  ['Lot E', 'server/models/index.js', 'modele branche',
+    ["require('./Ban')", 'bannedBy'], []],
+  ['Lot E', 'server/routes/admin.js', 'routes du ban',
+    ["'/members/:id/ban'", "'/bans'", "'/bans/:id'",
+     'bannedEmails', 'A creator cannot be banned'], []],
+  ['Lot E', 'server/routes/auth.js', 'controle inscription + connexion',
+    ['Ban.isBanned'], []],
+  ['Lot E', 'client/src/api/client.js', 'appels du client',
+    ['banMember', 'bans:', 'unban'], []],
+  ['Lot E', 'client/src/views/Admin.vue', 'la question et la liste',
+    ['banTarget', 'confirmBan', 'Keep her pages', 'Erase everything',
+     'Banned addresses', 'admin.bans()'], []],
 
-  // ---------- LOT 9 : payer par X mois ----------
-  ['Lot 9', 'server/services/pricing.js', 'signature avec months',
-    ['async function quote(codes, months = 1)'], ['async function quote(codes) {']],
-  ['Lot 9', 'server/services/pricing.js', 'cas vide complete',
-    ['period_discount: 0'], []],
-  ['Lot 9', 'server/services/pricing.js', 'calcul de la remise',
-    ['six_month_discount', 'period_savings'], []],
-  ['Lot 9', 'server/models/Subscription.js', 'colonnes months/total_paid',
-    ['total_paid', 'months:'], []],
-  ['Lot 9', 'server/sql/schema.sql', 'schema a jour',
-    ['total_paid'], []],
-  ['Lot 9', 'server/routes/subscriptions.js', 'date sur n mois',
-    ['function inNMonths(n)'], ['function inAMonth()']],
-  ['Lot 9', 'server/routes/subscriptions.js', 'montant total debite',
-    ['quote.total'], []],
-  ['Lot 9', 'client/src/api/client.js', 'devis avec duree',
-    ['months: m'], []],
-  ['Lot 9', 'client/src/views/Plans.vue', 'selecteur de duree',
-    ['const months = ref(1)', 'PERIODS'], []],
-  ['Lot 9', 'client/src/views/Plans.vue', 'total affiche',
-    ['To pay now', 'quote.total'], []]
+  // ---------- LOT F : mot de passe oublie + email ----------
+  ['Lot F', 'server/sql/schema.sql', 'table des jetons',
+    ['CREATE TABLE auth_tokens', 'token_hash'], []],
+  ['Lot F', 'server/models/AuthToken.js', 'jeton hache, a usage unique',
+    ['AuthToken.issue', 'AuthToken.consume', 'sha256', 'used_at'], []],
+  ['Lot F', 'server/models/index.js', 'modele branche',
+    ["require('./AuthToken')", 'authTokens'], []],
+  ['Lot F', 'server/routes/auth.js', 'les 5 routes',
+    ["'/forgot'", "'/reset'", "'/email'", "'/email/confirm'", "'/token/:token'"], []],
+  ['Lot F', 'server/routes/auth.js', 'durees de vie',
+    ['RESET_MINUTES', 'EMAIL_MINUTES'], []],
+  ['Lot F', 'server/routes/auth.js', 'les groupes suivent la nouvelle adresse',
+    ['Member.update'], []],
+
+  // ---------- LOT C : add-on Music (le lot note) ----------
+  ['Lot C', 'server/sql/schema.sql', 'le plan music en base',
+    ["('music', 'Music'"], []],
+  ['Lot C', 'server/services/pricing.js', 'palier de remise corrige',
+    ['addOns.length >= 2'], ['addOns.length === 2']],
+  ['Lot C', 'server/routes/issues.js', 'verrou cote serveur',
+    ['music_player', "hasAddOn(req.account.id, 'music')"], []],
+  ['Lot C', 'client/src/components/Newspaper.vue', 'lecteur reserve aux abonnees',
+    ['music: { type: Boolean', 'part of the Music add-on'], []],
+  ['Lot C', 'client/src/views/Issue.vue', 'passage de la prop',
+    ['music_player'], []],
+
+  // ---------- FAUSSE BOITE MAIL : serveur ----------
+  ['Boite mail (serveur)', 'server/sql/schema.sql', 'table des mails',
+    ['CREATE TABLE mails'], []],
+  ['Boite mail (serveur)', 'server/models/Mail.js', 'la seule porte de sortie',
+    ['Mail.send'], []],
+  ['Boite mail (serveur)', 'server/models/index.js', 'modele branche',
+    ["require('./Mail')", 'AuthToken, Mail'], []],
+  ['Boite mail (serveur)', 'server/routes/mails.js', 'routes de la boite',
+    ["'/:id/read'"], []],
+  ['Boite mail (serveur)', 'server/index.js', 'routes montees',
+    ["app.use('/api/mails'"], []],
+  ['Boite mail (serveur)', 'server/routes/auth.js', 'le jeton part dans le lien',
+    ['Mail.send', "link: '/link/' + raw", 'sent_to'],
+    ['token: raw']],
+
+  // ---------- FAUSSE BOITE MAIL : client ----------
+  ['Boite mail (client)', 'client/src/api/client.js', 'appels de la boite',
+    ['export const mails', 'inspectToken', 'both by mailed link'],
+    ['both by code']],
+  ['Boite mail (client)', 'client/src/router/index.js', 'les 2 routes publiques',
+    ["name: 'mailbox'", "path: '/link/:token'"], []],
+  ['Boite mail (client)', 'client/src/views/Mailbox.vue', 'la boite elle-meme',
+    ['apiMails.inbox', 'Follow the link'], []],
+  ['Boite mail (client)', 'client/src/views/Link.vue', 'la page du lien',
+    ['inspectToken', 'password_reset', 'email_change'], []],
+  ['Boite mail (client)', 'client/src/views/Login.vue', 'mot de passe oublie',
+    ['askMail', 'sentTo', "name: 'mailbox'"],
+    ['codeShown', 'resetToken']],
+  ['Boite mail (client)', 'client/src/views/Profile.vue', 'changement d\'adresse',
+    ['askEmailChange', 'emailSentTo'],
+    ['emailCodeShown', 'emailToken']],
+
+  // ---------- L'IMPRIMERIE ----------
+  ['Imprimerie', 'client/src/views/Shop.vue', 'mention sur la page papier',
+    ['Printed by a local press'], []]
+];
+
+// Les pieges d'ordre : Express lit ses routes dans l'ordre d'ecriture.
+const ORDER = [
+  ['Lot D', 'server/routes/issues.js',
+    'pending-deletions declaree AVANT /:id',
+    "'/pending-deletions/:groupId'", "router.get('/:id'"]
 ];
 
 if (!fs.existsSync('package.json')) {
@@ -82,6 +150,31 @@ for (const [group, file, label, mustHave, mustNotHave] of CHECKS) {
     console.log('  [!!] ' + label + '   (' + file + ')');
     missing.forEach(s => console.log('       manque        : ' + s));
     leftover.forEach(s => console.log('       a supprimer   : ' + s));
+    ko++;
+  }
+}
+
+console.log('\n──── Ordre des routes ────');
+for (const [group, file, label, first, second] of ORDER) {
+  const text = read(file);
+  if (text === null) {
+    console.log('  [?] ' + label + '  --> fichier introuvable : ' + file);
+    ko++; continue;
+  }
+  const a = text.indexOf(first);
+  const b = text.indexOf(second);
+  if (a === -1 || b === -1) {
+    console.log('  [!!] ' + label + '   (' + file + ')');
+    if (a === -1) console.log('       introuvable   : ' + first);
+    if (b === -1) console.log('       introuvable   : ' + second);
+    ko++;
+  } else if (a < b) {
+    console.log('  [OK] ' + label);
+    ok++;
+  } else {
+    console.log('  [!!] ' + label + '   (' + file + ')');
+    console.log('       ' + first + ' doit etre AVANT ' + second);
+    console.log('       sinon Express lit "pending-deletions" comme un id de numero');
     ko++;
   }
 }

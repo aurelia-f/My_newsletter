@@ -321,6 +321,95 @@ CREATE TABLE sessions (
   data       MEDIUMTEXT
 ) ENGINE=InnoDB;
 
+-- ------------------------------------------------------------
+-- 17. ISSUE DELETION VOTES
+--     Supprimer un numéro depuis la page du groupe. Une admin du
+--     groupe supprime directement. N'importe qui d'autre doit
+--     demander : une ligne par personne qui accepte, et le numéro
+--     ne part que quand toutes ont accepté. La ligne de la
+--     demandeuse est écrite avec la demande : demander = accepter.
+-- ------------------------------------------------------------
+CREATE TABLE issue_deletion_votes (
+  id           CHAR(36) NOT NULL PRIMARY KEY,
+  issue_id     CHAR(36) NOT NULL,
+  requested_by CHAR(36) NOT NULL,
+  account_id   CHAR(36) NOT NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_idv_issue FOREIGN KEY (issue_id)
+    REFERENCES issues(id) ON DELETE CASCADE,
+  CONSTRAINT fk_idv_requested_by FOREIGN KEY (requested_by)
+    REFERENCES accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_idv_account FOREIGN KEY (account_id)
+    REFERENCES accounts(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_deletion_vote (issue_id, account_id)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- 18. BANS
+--     Bannir se fait au niveau du SITE, sur l'adresse e-mail et
+--     non sur le compte : le compte peut avoir été détruit, et
+--     c'est l'adresse qu'il faut empêcher de revenir. Contrôlée
+--     à l'inscription et à la connexion.
+--     kept_pages garde la trace de ce qu'on a décidé de faire de
+--     ses pages au moment du bannissement.
+-- ------------------------------------------------------------
+CREATE TABLE bans (
+  id         CHAR(36)     NOT NULL PRIMARY KEY,
+  email      VARCHAR(190) NOT NULL UNIQUE,
+  first_name VARCHAR(80),
+  reason     VARCHAR(255),
+  kept_pages BOOLEAN      NOT NULL DEFAULT TRUE,
+  banned_by  CHAR(36),
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_bans_banned_by FOREIGN KEY (banned_by)
+    REFERENCES accounts(id) ON DELETE SET NULL,
+  INDEX idx_bans_email (email)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- 19. AUTH TOKENS
+--     Forgotten password and change of e-mail address. There is
+--     no mail service on this site, so the code is shown on
+--     screen: it stands in for the e-mail you would receive.
+--     The token itself is NEVER stored, only its SHA-256 hash —
+--     same idea as bcrypt on the passwords. Single use
+--     (used_at) and dated (expires_at).
+-- ------------------------------------------------------------
+CREATE TABLE auth_tokens (
+  id         CHAR(36) NOT NULL PRIMARY KEY,
+  account_id CHAR(36) NOT NULL,
+  purpose    ENUM('password_reset','email_change') NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  new_email  VARCHAR(190),
+  expires_at DATETIME NOT NULL,
+  used_at    DATETIME,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_tokens_account FOREIGN KEY (account_id)
+    REFERENCES accounts(id) ON DELETE CASCADE,
+  INDEX idx_tokens_hash (token_hash),
+  INDEX idx_tokens_account (account_id, purpose)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- 20. MAILS — the local mail catcher
+--     This site sends no real mail. Instead, every message is
+--     written here and read in /mailbox, exactly as MailHog or
+--     Mailtrap do in development. The token travels in the link,
+--     never on the screen of whoever asked for it.
+--     Going live means one thing: handing these rows to an SMTP
+--     service instead of storing them.
+-- ------------------------------------------------------------
+CREATE TABLE mails (
+  id         CHAR(36)     NOT NULL PRIMARY KEY,
+  to_email   VARCHAR(190) NOT NULL,
+  subject    VARCHAR(190) NOT NULL,
+  body       TEXT         NOT NULL,
+  link       VARCHAR(500),
+  read_at    DATETIME,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_mails_to (to_email, created_at)
+) ENGINE=InnoDB;
+
 -- ============================================================
 --  STARTING DATA
 -- ============================================================

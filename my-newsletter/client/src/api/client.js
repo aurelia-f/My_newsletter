@@ -50,8 +50,23 @@ export const auth = {
   login:    (d) => api.post('/auth/login', d),
   logout:   ()  => api.post('/auth/logout'),
   me:       ()  => api.get('/auth/me'),
-  password: (d) => api.patch('/auth/password', d)
+  password: (d) => api.patch('/auth/password', d),
+
+  // Forgotten password, and change of address — both by mailed link
+  forgot:       (d) => api.post('/auth/forgot', d),
+  reset:        (d) => api.post('/auth/reset', d),
+  changeEmail:  (d) => api.post('/auth/email', d),
+  confirmEmail: (d) => api.post('/auth/email/confirm', d),
+  inspectToken: (t) => api.get('/auth/token/' + t)
 };
+
+// The local mail catcher: a development tool, not a feature.
+export const mails = {
+  inbox:  (email) => api.get('/mails?email=' + encodeURIComponent(email)),
+  read:   (id)    => api.patch(`/mails/${id}/read`),
+  remove: (id)    => api.delete('/mails/' + id)
+};
+
 
 export const profiles = {
   me:       ()   => api.get('/profiles/me'),
@@ -69,7 +84,12 @@ export const groups = {
   create:     (d)         => api.post('/groups', d),
   one:        (id)        => api.get('/groups/' + id),
   update:     (id, d)     => api.patch('/groups/' + id, d),
-  remove:     (id)        => api.delete('/groups/' + id),
+  remove:  (id)     => api.delete('/issues/' + id),
+  // Deleting an issue with the group's agreement
+  pendingDeletions: (groupId) => api.get('/issues/pending-deletions/' + groupId),
+  askDeletion:      (id)      => api.post(`/issues/${id}/deletion`),
+  agreeDeletion:    (id)      => api.post(`/issues/${id}/deletion/agree`),
+  cancelDeletion:   (id)      => api.delete(`/issues/${id}/deletion`),
   invite:     (id, d)     => api.post(`/groups/${id}/members`, d),
   changeRole: (id, m, r)  => api.patch(`/groups/${id}/members/${m}`, { role: r }),
   removeMember: (id, m)   => api.delete(`/groups/${id}/members/${m}`)
@@ -136,5 +156,10 @@ export const admin = {
   updateAd:    (id, d)   => api.patch('/admin/ads/' + id, d),
   removeAd:    (id)      => api.delete('/admin/ads/' + id),
   prices:      ()        => api.get('/admin/prices'),
-  savePrices:  (d)       => api.patch('/admin/prices', d)
+  savePrices:  (d)       => api.patch('/admin/prices', d),
+
+  // Banning, at site level
+  banMember:   (id, d)   => api.post(`/admin/members/${id}/ban`, d),
+  bans:        ()        => api.get('/admin/bans'),
+  unban:       (id)      => api.delete('/admin/bans/' + id)
 };

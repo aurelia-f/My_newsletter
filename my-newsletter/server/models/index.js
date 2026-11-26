@@ -19,6 +19,10 @@ const Payment       = require('./Payment');
 const Order         = require('./Order');
 const Ad            = require('./Ad');
 const AdStat        = require('./AdStat');
+const IssueDeletionVote = require('./IssueDeletionVote');
+const Ban = require('./Ban');
+const AuthToken = require('./AuthToken');
+const Mail = require('./Mail');
 
 // --- Groups and members -------------------------------------
 Account.hasMany(Group,   { foreignKey: 'created_by', as: 'createdGroups' });
@@ -40,6 +44,11 @@ Entry.belongsTo(Issue,   { foreignKey: 'issue_id', as: 'issue' });
 Account.hasMany(Entry,   { foreignKey: 'account_id', as: 'entries' });
 Entry.belongsTo(Account, { foreignKey: 'account_id', as: 'author' });
 
+Issue.hasMany(IssueDeletionVote,     { foreignKey: 'issue_id', as: 'deletionVotes', onDelete: 'CASCADE' });
+IssueDeletionVote.belongsTo(Issue,   { foreignKey: 'issue_id', as: 'issue' });
+IssueDeletionVote.belongsTo(Account, { foreignKey: 'account_id', as: 'voter' });
+IssueDeletionVote.belongsTo(Account, { foreignKey: 'requested_by', as: 'requester' });
+
 // --- Questions between friends ------------------------------
 Issue.hasMany(AskedQuestion,    { foreignKey: 'issue_id', as: 'askedQuestions', onDelete: 'CASCADE' });
 AskedQuestion.belongsTo(Issue,  { foreignKey: 'issue_id', as: 'issue' });
@@ -54,6 +63,21 @@ Reaction.belongsTo(Account, { foreignKey: 'account_id', as: 'author' });
 // --- Drafts -------------------------------------------------
 Account.hasMany(Draft,   { foreignKey: 'account_id', as: 'drafts' });
 Draft.belongsTo(Account, { foreignKey: 'account_id', as: 'account' });
+
+// --- Banned addresses ---------------------------------------
+Ban.belongsTo(Account, { foreignKey: 'banned_by', as: 'bannedBy' });
+
+// --- One-shot codes -----------------------------------------
+Account.hasMany(AuthToken,     { foreignKey: 'account_id', as: 'authTokens', onDelete: 'CASCADE' });
+AuthToken.belongsTo(Account,   { foreignKey: 'account_id', as: 'account' });
+
+// --- The mail catcher ---------------------------------------
+//  Deliberately tied to nothing: a mail is addressed to an e-mail
+//  ADDRESS, which may belong to no account at all.
+
+// --- One-shot codes -----------------------------------------
+Account.hasMany(AuthToken,     { foreignKey: 'account_id', as: 'authTokens', onDelete: 'CASCADE' });
+AuthToken.belongsTo(Account,   { foreignKey: 'account_id', as: 'account' });
 
 // --- Making money -------------------------------------------
 Account.hasMany(Subscription,   { foreignKey: 'account_id', as: 'subscriptions' });
@@ -73,5 +97,5 @@ AdStat.belongsTo(Ad,   { foreignKey: 'ad_id', as: 'ad' });
 module.exports = {
   sequelize,
   Account, Group, Member, Issue, Entry, AskedQuestion, Reaction,
-  Draft, Setting, Plan, Subscription, Payment, Order, Ad, AdStat
+  Draft, Setting, Plan, Subscription, Payment, Order, Ad, AdStat, IssueDeletionVote, Ban, AuthToken, Mail
 };

@@ -21,6 +21,9 @@ const inviteEmail = ref('');
 const inviteName = ref('');
 const monthToOpen = ref(recentMonths(3)[0]);
 
+const pendingDeletions = ref([]);
+const deletionFor = (id) => pendingDeletions.value.find(d => d.issue_id === id);
+
 const iAmAdmin = computed(() => group.value?.my_role === 'admin');
 const freeMonths = computed(() => {
   const taken = new Set((group.value?.issues || []).map(i => i.month?.slice(0, 10)));
@@ -33,6 +36,7 @@ async function load() {
   loading.value = true;
   try {
     group.value = await apiGroups.one(props.id);
+    pendingDeletions.value = await issues.pendingDeletions(props.id);
     if (freeMonths.value.length) monthToOpen.value = freeMonths.value[0];
   } catch (e) {
     error.value = e.message;
@@ -57,6 +61,19 @@ const openIssue = () => act(
 
 const publish = (id) => act(() => issues.publish(id), 'Issue published.');
 
+function deleteIssue(id, label) {
+  if (!confirm(`Delete the ${label} issue and every page in it? This cannot be undone.`)) return;
+  act(() => issues.remove(id), 'Issue deleted.');
+}
+
+function askDeletion(id, label) {
+  if (!confirm(`Ask the group to delete the ${label} issue? Everybody has to agree.`)) return;
+  act(() => issues.askDeletion(id), 'The group has been asked.');
+}
+
+const agreeDeletion  = (id) => act(() => issues.agreeDeletion(id), 'Your answer is saved.');
+const cancelDeletion = (id) => act(() => issues.cancelDeletion(id), 'Request called off.');
+
 const changeRole = (m, role) => act(
   () => apiGroups.changeRole(props.id, m, role), 'Role changed.');
 
@@ -79,6 +96,26 @@ async function deleteGroup() {
 
   <div v-else-if="group" class="page">
     <RouterLink class="back-link" to="/groups">All my groups</RouterLink>
+
+    <!-- Somebody wants an issue gone: everybody has to agree -->
+    <div v-for="d in pendingDeletions" :key="d.issue_id"
+         class="card card-danger" style="margin-bottom:14px">
+      <h3 style="margin:0 0 6px">
+        {{ d.asked_by_me ? 'You want' : d.asked_by + ' wants' }}
+        to delete the {{ monthInWords(d.month) }} newspaper. Do you agree?
+      </h3>
+      <p class="muted" style="margin:0 0 12px">
+        {{ d.agreed }} of {{ d.needed }} have agreed so far.
+        The issue only goes once everybody has.
+      </p>
+      <div class="row" style="gap:8px">
+        <button v-if="!d.i_agreed" class="btn small" type="button"
+                @click="agreeDeletion(d.issue_id)">I agree</button>
+        <span v-else class="tag">You agreed</span>
+        <button v-if="d.asked_by_me || iAmAdmin" class="btn small outline" type="button"
+                @click="cancelDeletion(d.issue_id)">Call it off</button>
+      </div>
+    </div>
 
     <div class="cover" :style="group.color ? { '--group': group.color } : {}">
       <span class="emoji"><GroupIcon :value="group.icon" large /></span>
@@ -117,9 +154,17 @@ async function deleteGroup() {
             <RouterLink v-else class="btn small outline" :to="'/write/' + i.month.slice(0, 10)">
               Answer
             </RouterLink>
-            <button v-if="iAmAdmin && i.status !== 'published'"
+                        <button v-if="iAmAdmin && i.status !== 'published'"
                     class="btn small" type="button" @click="publish(i.id)">
               Publish
+            </button>
+            <button v-if="iAmAdmin" class="btn small outline" type="button"
+                    @click="deleteIssue(i.id, monthInWords(i.month))">
+              Delete
+            </button>
+            <button v-else-if="!deletionFor(i.id)" class="btn small outline" type="button"
+                    @click="askDeletion(i.id, monthInWords(i.month))">
+              Ask to delete
             </button>
           </div>
         </div>

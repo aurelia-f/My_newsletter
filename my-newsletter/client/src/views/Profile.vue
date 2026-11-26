@@ -1,6 +1,7 @@
 <!-- My profile card: what appears under my name in the newspaper. -->
 <script setup>
 import { ref, onMounted } from 'vue';
+import { RouterLink } from 'vue-router';
 import { profiles, auth } from '../api/client';
 import { state } from '../api/state';
 import Loading from '../components/Loading.vue';
@@ -16,6 +17,24 @@ const current = ref('');
 const next = ref('');
 const passwordInfo = ref('');
 const passwordError = ref('');
+
+const newEmail = ref('');
+const emailPassword = ref('');
+const emailSentTo = ref('');
+const emailInfo = ref('');
+const emailError = ref('');
+
+async function askEmailChange() {
+  emailError.value = ''; emailInfo.value = ''; emailSentTo.value = '';
+  try {
+    const answer = await auth.changeEmail({
+      new_email: newEmail.value, password: emailPassword.value
+    });
+    emailSentTo.value = answer.sent_to;
+    emailInfo.value = 'Sent. Open that mailbox and follow the link.';
+    emailPassword.value = '';
+  } catch (e) { emailError.value = e.message; }
+}
 
 const FIELDS = [
   { key: 'first_name', label: 'My first name', hint: 'This is what appears in the newspaper.' },
@@ -134,8 +153,38 @@ async function changePassword() {
           <span class="hint">Eight characters at least.</span>
           <input type="password" v-model="next" required autocomplete="new-password">
         </label>
-        <button class="btn outline" type="submit">Change it</button>
+                <button class="btn outline" type="submit">Change it</button>
       </form>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Change my e-mail address</h3>
+            <p class="muted" style="margin:6px 0 14px">
+        Your password, then a message goes to the new address with a link to
+        confirm. Your groups follow you: you stay exactly where you are.
+      </p>
+
+      <Notice :text="emailError" kind="error" />
+      <Notice :text="emailInfo" kind="ok" />
+
+      <form @submit.prevent="askEmailChange">
+        <label class="field">
+          <span class="label">My new address</span>
+          <input type="email" v-model="newEmail" required placeholder="me@example.com">
+        </label>
+        <label class="field">
+          <span class="label">My password</span>
+          <input type="password" v-model="emailPassword" required
+                 autocomplete="current-password">
+        </label>
+        <button class="btn outline" type="submit">Send the link</button>
+      </form>
+
+      <p v-if="emailSentTo" style="margin-top:14px">
+        <RouterLink class="btn small" :to="{ name: 'mailbox', query: { email: emailSentTo } }">
+          Open that mailbox
+        </RouterLink>
+      </p>
     </div>
   </div>
 </template>

@@ -9,7 +9,7 @@ const express = require('express');
 const { Op, fn, col, literal } = require('sequelize');
 const {
   Account, Group, Member, Issue, Entry, Subscription, Payment,
-  Order, Ad, Plan, Setting, sequelize
+  Order, Ad, Plan, Setting, Ban, sequelize
 } = require('../models');
 const adServer = require('../services/ads');
 const { wrap } = require('../middleware/errors');
@@ -127,6 +127,10 @@ router.get('/members', wrap(async (req, res) => {
     where, order: [['created_at', 'DESC']], limit: 200
   });
 
+    const bannedEmails = new Set(
+    (await Ban.findAll({ attributes: ['email'] })).map(b => b.email)
+  );
+
   const enriched = await Promise.all(accounts.map(async a => {
     const sub = await Subscription.findOne({
       where: { account_id: a.id, status: 'active' }
@@ -135,10 +139,66 @@ router.get('/members', wrap(async (req, res) => {
       ...a.toPublic(),
       groups_created: await Group.count({ where: { created_by: a.id } }),
       memberships: await Member.count({ where: { account_id: a.id } }),
+      banned: bannedEmails.has(a.email),
       subscription: sub ? { add_ons: sub.add_ons, price: sub.monthly_price } : null
     };
   }));
   res.json(enriched);
+}));
+
+// --- POST /api/admin/members/:id/ban ------------------------
+//  Banning, at SITE level. keep_pages decides what happens to
+//  the pages she has already sent:
+//    true  → the account row stays, so the published issues keep
+//            their pages. Signing in is blocked by the ban, which
+//            sits on the e-mail address, not on the account.
+//    false → the account is destroyed, and ON DELETE CASCADE
+//            takes her pages, drafts and reactions with it.
+router.post('/members/:id/ban', wrap(async (req, res) => {
+  const { v4: uuid } = require('uuid');
+
+  const account = await Account.findByPk(req.params.id);
+  if (!account) return res.status(404).json({ error: 'Account not found.' });
+  if (account.site_role === 'admin') {
+    return res.status(403).json({ error: 'A creator cannot be banned.' });
+  }
+
+  const keepPages = req.body.keep_pages !== false;
+  const email = account.email.trim().toLowerCase();
+
+  await Ban.destroy({ where: { email } });
+  await Ban.create({
+    id: uuid(), email, first_name: account.first_name,
+    reason: String(req.body.reason || '').slice(0, 255) || null,
+    kept_pages: keepPages, banned_by: req.account.id
+  });
+
+  // She leaves every group either way, invitations included.
+  await Member.destroy({
+    where: { [Op.or]: [{ account_id: account.id }, { email }] }
+  });
+
+  if (keepPages) {
+    // Pages she had not sent yet are no use to anybody.
+    await Entry.destroy({ where: { account_id: account.id, sent: false } });
+  } else {
+    await account.destroy();
+  }
+
+  res.json({ ok: true, kept_pages: keepPages, account_deleted: !keepPages });
+}));
+
+// --- GET /api/admin/bans ------------------------------------
+router.get('/bans', wrap(async (req, res) => {
+  res.json(await Ban.findAll({ order: [['created_at', 'DESC']] }));
+}));
+
+// --- DELETE /api/admin/bans/:id -----------------------------
+//  Letting her back in. Her old pages do not come back if they
+//  were erased.
+router.delete('/bans/:id', wrap(async (req, res) => {
+  await Ban.destroy({ where: { id: req.params.id } });
+  res.json({ ok: true });
 }));
 
 // --- GET /api/admin/orders ----------------------------------

@@ -14,8 +14,15 @@ const routes = [
     meta: { public: true } },
   { path: '/signup',      name: 'signup',  component: () => import('../views/Signup.vue'),
     meta: { public: true } },
-  { path: '/plans',       name: 'plans',   component: () => import('../views/Plans.vue'),
+    { path: '/plans',       name: 'plans',   component: () => import('../views/Plans.vue'),
     meta: { public: true } },
+
+  // Public on purpose: somebody resetting a password is, by
+  // definition, not signed in.
+  { path: '/mailbox',     name: 'mailbox', component: () => import('../views/Mailbox.vue'),
+    meta: { public: true } },
+  { path: '/link/:token', name: 'link',    component: () => import('../views/Link.vue'),
+    props: true, meta: { public: true } },
 
   { path: '/groups',      name: 'groups',  component: () => import('../views/Groups.vue') },
   { path: '/groups/:id',  name: 'group',   component: () => import('../views/Group.vue'), props: true },

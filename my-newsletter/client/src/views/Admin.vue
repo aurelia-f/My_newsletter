@@ -24,6 +24,9 @@ const members = ref([]);
 const orders = ref([]);
 const adsPanel = ref({ ads: [], formats: {} });
 const prices = ref({ plans: [], settings: [] });
+const bans = ref([]);
+const banTarget = ref(null);
+const banReason = ref('');
 
 const search = ref('');
 const newAd = ref({ title: '', image_url: '', link: '', slot: 'home_banner' });
@@ -48,18 +51,42 @@ onMounted(load);
 async function load() {
   loading.value = true;
   try {
-    const [b, s, m, o, a, p] = await Promise.all([
+    const [b, s, m, o, a, p, bn] = await Promise.all([
       admin.dashboard(), admin.signups(), admin.members(),
-      admin.orders(), admin.ads(), admin.prices()
+      admin.orders(), admin.ads(), admin.prices(), admin.bans()
     ]);
     board.value = b; signups.value = s; members.value = m;
     orders.value = o; adsPanel.value = a; prices.value = p;
+    bans.value = bn;
   } catch (e) { error.value = e.message; }
   finally { loading.value = false; }
 }
 
 async function runSearch() {
   try { members.value = await admin.members(search.value); }
+  catch (e) { error.value = e.message; }
+}
+
+function startBan(m) {
+  banTarget.value = m;
+  banReason.value = '';
+}
+
+async function confirmBan(m, keepPages) {
+  const what = keepPages
+    ? 'Her pages in the published issues stay.'
+    : 'Every page she wrote is erased, published issues included.';
+  if (!confirm(`Ban ${m.first_name || m.email}? ${what} This cannot be undone.`)) return;
+  try {
+    await admin.banMember(m.id, { keep_pages: keepPages, reason: banReason.value });
+    banTarget.value = null;
+    info.value = keepPages ? 'Banned. Her pages were kept.' : 'Banned. Her pages were erased.';
+    await load();
+  } catch (e) { error.value = e.message; }
+}
+
+async function unban(id) {
+  try { await admin.unban(id); info.value = 'Allowed back.'; await load(); }
   catch (e) { error.value = e.message; }
 }
 
@@ -243,10 +270,42 @@ async function savePrices() {
                 · {{ m.memberships }} membership(s)
               </p>
             </div>
-            <span v-if="m.subscription" class="tag">
-              {{ euros(m.subscription.price) }}/mo
-            </span>
-            <span v-else class="muted">free</span>
+            <div class="row" style="gap:8px">
+              <span v-if="m.banned" class="tag">Banned</span>
+              <span v-if="m.subscription" class="tag">
+                {{ euros(m.subscription.price) }}/mo
+              </span>
+              <span v-else class="muted">free</span>
+              <button v-if="m.site_role !== 'admin' && !m.banned"
+                      class="btn small outline" type="button" @click="startBan(m)">
+                Ban
+              </button>
+            </div>
+          </div>
+
+          <!-- The question, asked at the moment of the action -->
+          <div v-if="banTarget && banTarget.id === m.id"
+               class="card card-danger" style="margin-top:12px">
+            <h3 style="margin:0 0 6px">Ban {{ m.first_name || m.email }}?</h3>
+            <p class="muted" style="margin:0 0 12px">
+              She leaves every group, and cannot sign in or sign up again.
+              What do we do with her pages in the issues already published?
+            </p>
+            <label class="field">
+              <span class="label">Reason (optional, for us)</span>
+              <input type="text" v-model="banReason" placeholder="Harassment, spam…">
+            </label>
+            <div class="row" style="gap:8px">
+              <button class="btn small" type="button" @click="confirmBan(m, true)">
+                Keep her pages
+              </button>
+              <button class="btn small outline" type="button" @click="confirmBan(m, false)">
+                Erase everything
+              </button>
+              <button class="btn small outline" type="button" @click="banTarget = null">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -291,6 +350,26 @@ async function savePrices() {
         </div>
         <p v-if="!orders.length" class="muted">No orders yet.</p>
       </div>
+            <template v-if="bans.length">
+        <h3 style="margin:22px 0 10px">Banned addresses</h3>
+        <div class="stack">
+          <div v-for="b in bans" :key="b.id" class="card member-row">
+            <div class="row spread">
+              <div>
+                <strong>{{ b.first_name || b.email.split('@')[0] }}</strong>
+                <p class="muted" style="margin:2px 0 0;font-size:.85rem">
+                  {{ b.email }} · banned {{ shortDate(b.created_at) }}
+                  · {{ b.kept_pages ? 'pages kept' : 'pages erased' }}
+                  <span v-if="b.reason"> · {{ b.reason }}</span>
+                </p>
+              </div>
+              <button class="btn small outline" type="button" @click="unban(b.id)">
+                Allow back
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
     </section>
 
     <!-- ===== ADVERTS ===== -->

@@ -114,6 +114,10 @@ const STATUS_LABELS = {
       <span class="kicker">Shop</span>
       <h1>On real paper</h1>
       <p class="month">A newspaper you keep, dog-ear and read again.</p>
+      <p class="month">
+        Printed by a local press we work with: short runs, proper newsprint,
+        nobody in between.
+      </p>
     </div>
 
     <Notice :text="error" kind="error" />

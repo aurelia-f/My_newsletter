@@ -110,6 +110,7 @@ app.use('/api/subscriptions', require('./routes/subscriptions'));
 app.use('/api/shop',          require('./routes/shop'));
 app.use('/api/ads',           require('./routes/ads'));
 app.use('/api/admin',         require('./routes/admin'));
+app.use('/api/mails',         require('./routes/mails'));
 
 // An unknown API route answers in JSON, never in HTML.
 app.use('/api', (req, res) => res.status(404).json({ error: 'Unknown route.' }));

@@ -8,7 +8,7 @@
 const express = require('express');
 const { Op } = require('sequelize');
 const { v4: uuid } = require('uuid');
-const { Account, Issue, Group, Member, Entry, Reaction } = require('../models');
+const { Account, Issue, Group, Member, Entry, Reaction, IssueDeletionVote } = require('../models');
 const { questionsForMonth } = require('../config/questions');
 const { wrap } = require('../middleware/errors');
 const {
@@ -35,6 +35,37 @@ function shiftedMonth(n) {
   const year = Math.floor(total / 12);
   const month = String((total % 12) + 1).padStart(2, '0');
   return `${year}-${month}-01`;
+}
+
+/**
+ * Everyone in the group who can vote: members who have actually
+ * signed up. A pending invitation has no account yet, so it cannot
+ * agree to anything and is not counted.
+ */
+async function votersOf(groupId) {
+  const members = await Member.findAll({
+    where: { group_id: groupId }, attributes: ['account_id']
+  });
+  return members.map(m => m.account_id).filter(Boolean);
+}
+
+/**
+ * Destroys the issue if every voter has agreed. The votes go with
+ * it (ON DELETE CASCADE). Returns true when the issue is gone.
+ */
+async function deleteIfUnanimous(issue) {
+  const voters = await votersOf(issue.group_id);
+  const votes = await IssueDeletionVote.findAll({
+    where: { issue_id: issue.id }, attributes: ['account_id']
+  });
+  const agreed = new Set(votes.map(v => v.account_id));
+
+  if (!voters.every(id => agreed.has(id))) return false;
+
+  const groupId = issue.group_id;
+  await issue.destroy();
+  await renumber(groupId);
+  return true;
 }
 
 // --- GET /api/issues/open -----------------------------------
@@ -77,6 +108,38 @@ router.get('/mine', wrap(async (req, res) => {
     order: [['published_at', 'DESC']]
   });
   res.json(issues);
+}));
+
+// --- GET /api/issues/pending-deletions/:groupId -------------
+//  The deletion requests waiting in one group, for the banner at
+//  the top of the group page. Declared BEFORE '/:id' on purpose.
+router.get('/pending-deletions/:groupId', requireMember, wrap(async (req, res) => {
+  const groupIssues = await Issue.findAll({
+    where: { group_id: req.params.groupId }, attributes: ['id', 'number', 'month']
+  });
+  if (groupIssues.length === 0) return res.json([]);
+
+  const votes = await IssueDeletionVote.findAll({
+    where: { issue_id: groupIssues.map(i => i.id) },
+    include: [{ model: Account, as: 'requester', attributes: ['id', 'first_name'] }]
+  });
+  if (votes.length === 0) return res.json([]);
+
+  const voters = await votersOf(req.params.groupId);
+
+  const pending = groupIssues.map(issue => {
+    const own = votes.filter(v => v.issue_id === issue.id);
+    if (own.length === 0) return null;
+    return {
+      issue_id: issue.id, number: issue.number, month: issue.month,
+      asked_by: own[0].requester ? own[0].requester.first_name : 'Someone',
+      asked_by_me: own[0].requested_by === req.account.id,
+      agreed: own.length, needed: voters.length,
+      i_agreed: own.some(v => v.account_id === req.account.id)
+    };
+  }).filter(Boolean);
+
+  res.json(pending);
 }));
 
 // --- POST /api/issues ---------------------------------------
@@ -204,6 +267,65 @@ router.delete('/:id', byIssue(requireGroupAdmin), wrap(async (req, res) => {
   const groupId = req.issue.group_id;
   await req.issue.destroy();
   await renumber(groupId);
+  res.json({ ok: true });
+}));
+
+// --- POST /api/issues/:id/deletion --------------------------
+//  Anyone who is not a group admin asks the group. The request
+//  counts as her own agreement, so a group of one deletes at once.
+router.post('/:id/deletion', byIssue(requireMember), wrap(async (req, res) => {
+  const issue = req.issue;
+
+  const already = await IssueDeletionVote.findOne({ where: { issue_id: issue.id } });
+  if (already) {
+    return res.status(409).json({ error: 'Someone has already asked for this issue to go.' });
+  }
+
+  await IssueDeletionVote.create({
+    id: uuid(), issue_id: issue.id,
+    requested_by: req.account.id, account_id: req.account.id
+  });
+
+  const deleted = await deleteIfUnanimous(issue);
+  res.status(201).json({ ok: true, deleted });
+}));
+
+// --- POST /api/issues/:id/deletion/agree --------------------
+router.post('/:id/deletion/agree', byIssue(requireMember), wrap(async (req, res) => {
+  const issue = req.issue;
+
+  const request = await IssueDeletionVote.findOne({ where: { issue_id: issue.id } });
+  if (!request) {
+    return res.status(404).json({ error: 'Nobody has asked for this issue to go.' });
+  }
+
+  const mine = await IssueDeletionVote.findOne({
+    where: { issue_id: issue.id, account_id: req.account.id }
+  });
+  if (!mine) {
+    await IssueDeletionVote.create({
+      id: uuid(), issue_id: issue.id,
+      requested_by: request.requested_by, account_id: req.account.id
+    });
+  }
+
+  const deleted = await deleteIfUnanimous(issue);
+  res.json({ ok: true, deleted });
+}));
+
+// --- DELETE /api/issues/:id/deletion ------------------------
+//  Calling the vote off: the person who asked, or a group admin.
+router.delete('/:id/deletion', byIssue(requireMember), wrap(async (req, res) => {
+  const request = await IssueDeletionVote.findOne({ where: { issue_id: req.issue.id } });
+  if (!request) return res.json({ ok: true });
+
+  if (request.requested_by !== req.account.id && req.membership.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Only the person who asked, or an admin, can call this off.'
+    });
+  }
+
+  await IssueDeletionVote.destroy({ where: { issue_id: req.issue.id } });
   res.json({ ok: true });
 }));
 
