@@ -36,6 +36,10 @@ const RENDERINGS = [
 const iAmAdmin = computed(() => issue.value?.my_role === 'admin');
 const pages = computed(() => issue.value?.entries || []);
 
+// My own page in this issue: only its owner may arrange it.
+const myEntry = computed(() =>
+  pages.value.find(e => e.account_id === state.account?.id));
+
 // The footer: the group's first names, locked.
 const footer = computed(() =>
   pages.value.map(e => e.author?.first_name || 'A friend').join(' · '));
@@ -195,6 +199,8 @@ function print() { window.print(); }
           </h1>
         </div>
         <div class="row" style="gap:8px">
+          <RouterLink v-if="myEntry" class="btn outline small"
+                      :to="'/issues/' + id + '/arrange'">Arrange my page</RouterLink>
           <RouterLink class="btn outline small" to="/shop">Order it on paper</RouterLink>
           <button class="btn small" type="button" @click="print">Save as PDF</button>
         </div>

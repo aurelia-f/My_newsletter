@@ -30,6 +30,11 @@ const routes = [
   { path: '/write/:month?', name: 'write', component: () => import('../views/Questionnaire.vue'), props: true },
   { path: '/issues',      name: 'issues',  component: () => import('../views/Issues.vue') },
   { path: '/issues/:id',  name: 'issue',   component: () => import('../views/Issue.vue'), props: true },
+
+  // "Arrange my page how I like": the free placement editor.
+  // Only her own page; the server checks, this is convenience.
+  { path: '/issues/:id/arrange', name: 'arrange',
+    component: () => import('../views/EntryLayout.vue'), props: true },
   { path: '/shop',        name: 'shop',    component: () => import('../views/Shop.vue') },
   { path: '/admin',       name: 'admin',   component: () => import('../views/Admin.vue'),
     meta: { siteAdmin: true } },

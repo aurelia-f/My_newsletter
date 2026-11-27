@@ -2426,3 +2426,46 @@ input[type=color] {
   .np-handle,
   .thumb .remove-link { opacity: 1; }
 }
+/* ==========================================================
+   EDITING: THE SHEET KEEPS ITS A4 SIZE
+   While she arranges her page, the sheet must not grow. A page
+   taller than the paper hides the one thing she needs to see:
+   where the A4 stops. So it stays 1123 px, the bottom edge is
+   drawn in red, and `api/arrange.js` refuses to put a block
+   below it. Nothing is lost off the paper without her seeing it.
+   ========================================================== */
+.np-page.np-issue.np-fixed {
+  height: 1123px;
+  min-height: 1123px;
+  overflow: hidden;
+}
+.np-page.np-issue.np-fixed .np-body { overflow: hidden; }
+
+/* ---------- The bottom of the A4 ---------- */
+.np-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid #8c1d2f;
+  z-index: 5;
+  pointer-events: none;
+}
+.np-edge::after {
+  content: attr(data-label);
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: .05em;
+  color: #8c1d2f;
+  background: rgba(255, 255, 255, .85);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+@media print {
+  .np-edge { display: none !important; }
+}

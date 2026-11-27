@@ -5,13 +5,25 @@
      everywhere, whichever template is used. What changes is the
      body.
 
-     Five templates, handed out so that two neighbours never get
-     the same one, and so they rotate from month to month.
+     Two renderings of the body, from ONE list of pieces
+     (`api/pieces.js`):
+
+       - the templates — five of them, handed out so that two
+         neighbours never get the same one and so they rotate from
+         month to month. The browser places the pieces;
+       - the free canvas, when the person has arranged her page
+         herself (`entry.layout.free`). She places them.
+
+     There is no conversion from one to the other: both read the
+     same list. Nothing here touches the DOM by hand.
      ============================================================ -->
 <script setup>
 import { computed } from 'vue';
 import { monthInWords } from '../api/dates';
 import { state } from '../api/state';
+import { piecesOf, mergeLayout } from '../api/pieces';
+import NewspaperPiece from './NewspaperPiece.vue';
+import NewspaperCanvas from './NewspaperCanvas.vue';
 
 const props = defineProps({
   entry: { type: Object, required: true },
@@ -30,95 +42,29 @@ const props = defineProps({
 
 const TEMPLATES = ['g-classic', 'g-edit', 'g-dropcap', 'g-retro', 'g-urban'];
 
-const template = computed(() =>
-  TEMPLATES[(props.index + (Number(props.issue.number) || 0)) % TEMPLATES.length]);
+// All the pieces of this page, in reading order.
+const pieces = computed(() => piecesOf(props.entry, props.issue, props.asked));
+
+// Has she arranged this page herself?
+const free = computed(() => props.entry.layout?.free === true);
+
+// Free rendering: the pieces with the boxes she saved. A piece
+// that has vanished is dropped, a new one is stacked underneath.
+const placed = computed(() =>
+  free.value ? mergeLayout(pieces.value, props.entry.layout) : []);
+
+// Template rendering: the pieces as the browser will flow them.
+const photo   = computed(() => pieces.value.find(p => p.kind === 'photo'));
+const gallery = computed(() => pieces.value.find(p => p.kind === 'gallery'));
+const flow    = computed(() =>
+  pieces.value.filter(p => !['photo', 'gallery'].includes(p.kind)));
+
+const template = computed(() => free.value
+  ? 'g-free'
+  : TEMPLATES[(props.index + (Number(props.issue.number) || 0)) % TEMPLATES.length]);
 
 const name = computed(() => props.entry.author?.first_name || 'A friend');
-
-const content = computed(() => props.entry.content || {});
-const media   = computed(() => props.entry.media || []);
-const images  = computed(() => media.value.filter(m => m.type !== 'video'));
-
-// The page's photo: the first photo of the month. The profile
-// picture is the fallback, so the page is never bare.
-const mainPhoto = computed(() =>
-  images.value[0]?.url || props.entry.author?.avatar_url || null);
-
-const caption = computed(() => {
-  const a = props.entry.author || {};
-  return [a.occupation, a.city].filter(Boolean).join(' · ') || `${name.value}, this month`;
-});
-
-const standfirst = computed(() => content.value.summary || '');
-const quote = computed(() =>
-  props.entry.author?.motto || content.value.win || '');
-
-// The sections, minus the ones already used above.
-const USED = new Set(['summary', 'photos', 'cover_photo']);
-
-const blocks = computed(() =>
-  (props.issue.questions || [])
-    .filter(q => !USED.has(q.id))
-    .map(q => ({ question: q, value: content.value[q.id],
-                 label: content.value[q.id + '_label'] || q.label,
-                 link: content.value[q.id + '_link'] }))
-    .filter(b => filled(b.value)));
-
-// The questions put by friends, with the answer.
-const askedBlocks = computed(() =>
-  (props.asked || [])
-    .filter(q => filled(content.value['q_' + q.id]))
-    .map(q => ({
-      id: q.id,
-      text: q.text,
-      value: content.value['q_' + q.id],
-      byline: q.target_id
-        ? `${q.author?.first_name || 'A friend'} asks her`
-        : `${q.author?.first_name || 'A friend'} asks the group`
-    })));
-
-// The remaining photos and the videos, at the foot of the page.
-const gallery = computed(() => {
-  const skip = images.value.length && mainPhoto.value === images.value[0]?.url ? 1 : 0;
-  return media.value.slice(skip);
-});
-
 const footer = computed(() => props.issue.footer || '');
-
-function filled(v) {
-  return !(v == null || v === '' || (Array.isArray(v) && !v.length));
-}
-
-function stars(v) {
-  const n = Math.max(0, Math.min(5, Number(v) || 0));
-  return { full: '★'.repeat(n), empty: '★'.repeat(5 - n) };
-}
-
-function percent(q, v) {
-  const min = q.min ?? 0, max = q.max ?? 10;
-  return Math.round(((Number(v) - min) / (max - min)) * 100);
-}
-
-function asArray(v) { return Array.isArray(v) ? v : [v]; }
-
-/** Turns a Spotify or YouTube link into an embedded player. */
-function player(link) {
-  if (!link) return null;
-  try {
-    const u = new URL(link);
-    if (u.hostname.includes('spotify')) {
-      return { kind: 'spotify', src: 'https://open.spotify.com/embed' +
-        u.pathname.replace(/^\/(intl-[a-z]+\/)?/, '/') };
-    }
-    if (u.hostname.includes('youtu')) {
-      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
-      if (id && /^[\w-]{6,20}$/.test(id)) {
-        return { kind: 'youtube', src: 'https://www.youtube.com/embed/' + id };
-      }
-    }
-    return { kind: 'link', src: link };
-  } catch { return null; }
-}
 </script>
 
 <template>
@@ -152,85 +98,19 @@ function player(link) {
                class="np-sheet-end no-print"
                :style="{ top: (k * usable) + 'px' }"></div>
 
-          <figure class="np-photo" :class="{ 'np-photo-empty': !mainPhoto }">
-            <template v-if="mainPhoto">
-              <img :src="mainPhoto" alt="" loading="lazy">
-              <figcaption>{{ caption }}</figcaption>
-            </template>
-            <div v-else class="np-frame-empty">no photo this month</div>
-          </figure>
+          <!-- ----- Arranged by hand ----- -->
+          <NewspaperCanvas v-if="free" :pieces="placed" />
 
-          <div class="np-flow">
-            <p v-if="standfirst" class="np-standfirst">{{ standfirst }}</p>
-            <blockquote v-if="quote" class="np-quote">{{ quote }}</blockquote>
+          <!-- ----- Laid out by the template ----- -->
+          <template v-else>
+            <NewspaperPiece v-if="photo" :piece="photo" />
 
-            <!-- The sections -->
-            <section v-for="b in blocks" :key="b.question.id"
-                     class="np-block"
-                     :class="{ 'np-block-framed':
-                       ['choice','emojis','word','rating','slider'].includes(b.question.type) }"
-                     :data-id="b.question.id">
-              <h3 class="np-block-title">{{ b.label }}</h3>
+            <div class="np-flow">
+              <NewspaperPiece v-for="p in flow" :key="p.id" :piece="p" />
+            </div>
 
-              <template v-if="b.question.type === 'music'">
-                <p class="np-text">{{ b.value }}</p>
-                <div class="no-print" v-if="player(b.link)">
-                  <iframe v-if="player(b.link).kind === 'spotify'"
-                          :src="player(b.link).src" style="border-radius:12px;margin-top:10px"
-                          width="100%" height="152" frameborder="0" loading="lazy"
-                          allow="encrypted-media; clipboard-write"></iframe>
-                  <iframe v-else-if="player(b.link).kind === 'youtube'"
-                          :src="player(b.link).src" style="border-radius:12px;margin-top:10px"
-                          width="100%" height="200" frameborder="0" loading="lazy"
-                          allowfullscreen></iframe>
-                  <p v-else>
-                    <a :href="player(b.link).src" target="_blank" rel="noopener">Listen ↗</a>
-                  </p>
-                </div>
-              </template>
-
-              <p v-else-if="b.question.type === 'choice'" class="np-verdict">{{ b.value }}</p>
-
-              <p v-else-if="b.question.type === 'multi'" class="np-choice-list">
-                <span v-for="c in asArray(b.value)" :key="c">{{ c }}</span>
-              </p>
-
-              <p v-else-if="b.question.type === 'emojis'" class="np-emojis">
-                {{ asArray(b.value).join(' ') }}
-              </p>
-
-              <p v-else-if="b.question.type === 'word'" class="np-one-word">{{ b.value }}</p>
-
-              <p v-else-if="b.question.type === 'rating'" class="np-stars">
-                {{ stars(b.value).full
-                }}<span class="np-empties">{{ stars(b.value).empty }}</span>
-              </p>
-
-              <template v-else-if="b.question.type === 'slider'">
-                <div class="np-gauge">
-                  <div :style="{ width: percent(b.question, b.value) + '%' }"></div>
-                </div>
-                <p class="np-caption">{{ b.value }} out of {{ b.question.max ?? 10 }}</p>
-              </template>
-
-              <p v-else class="np-text">{{ b.value }}</p>
-            </section>
-
-            <!-- The questions from friends -->
-            <section v-for="q in askedBlocks" :key="'q' + q.id"
-                     class="np-block np-block-question" :data-id="'q_' + q.id">
-              <h3 class="np-block-title">{{ q.byline }}</h3>
-              <p class="np-question">{{ q.text }}</p>
-              <p class="np-text">{{ q.value }}</p>
-            </section>
-          </div>
-
-          <div v-if="gallery.length" class="np-gallery">
-            <template v-for="(m, i) in gallery" :key="i">
-              <video v-if="m.type === 'video'" :src="m.url" controls playsinline></video>
-              <img v-else :src="m.url" alt="" loading="lazy">
-            </template>
-          </div>
+            <NewspaperPiece v-if="gallery" :piece="gallery" />
+          </template>
         </div>
       </div>
 

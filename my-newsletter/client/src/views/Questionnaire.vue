@@ -16,7 +16,7 @@
      ============================================================ -->
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import { entries, issues, questions as apiQuestions, profiles, groups as apiGroups } from '../api/client';
 import { state } from '../api/state';
 import { monthInWords, currentMonth } from '../api/dates';
@@ -40,6 +40,7 @@ const chosen = ref([]);
 const asked = ref([]);
 const express = ref(false);
 const sending = ref(false);
+const router = useRouter();
 const saved = ref('');
 
 // Asking a question
@@ -218,10 +219,23 @@ async function send() {
     await entries.saveDraft(theMonth.value,
       { content: draft.value, media: media.value });
     const r = await entries.send({ month: theMonth.value, groups: chosen.value });
-    const ok = r.results.filter(x => x.ok).length;
+    const done = r.results.filter(x => x.ok);
     const failed = r.results.filter(x => !x.ok);
-    info.value = `Your page has gone to ${ok} group${ok > 1 ? 's' : ''}.`
-      + (failed.length ? ` (${failed.map(x => x.reason).join(' ')})` : '');
+
+    // Sent, and straight on to arranging the page: that is the
+    // moment she wants to see it, not a line of text telling her
+    // it has gone. The other groups got the same page and wait
+    // under My newspapers. If nothing went through, we stay here
+    // and say why.
+    if (done.length) {
+      router.push({ name: 'arrange', params: { id: done[0].issue_id },
+                    query: { sent: done.length } });
+      return;
+    }
+
+    info.value = failed.length
+      ? failed.map(x => x.reason).join(' ')
+      : 'Nothing was sent.';
     await load();
   } catch (e) {
     error.value = e.message;
